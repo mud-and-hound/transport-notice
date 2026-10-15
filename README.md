@@ -9,7 +9,7 @@
 - ไฟล์แนบ: `attach_files_here/` — วางไฟล์ **All.xlsx** และฟอร์ม **ใบแจ้งงานขนส่ง SST.xlsx** ได้เลย
 - Source: private repository บน GitHub; ยังไม่ได้เผยแพร่ GitHub Pages หรือ API ภายนอก
 
-ตำแหน่งปัจจุบัน: `/opt/vehiclelog/transport_notice` เพราะบัญชีนี้ไม่มีสิทธิ์สร้างโฟลเดอร์ตรง `/opt` ส่วนตำแหน่งปลายทางที่ต้องการคือ `/opt/transport_notice`
+ตำแหน่งโปรเจกต์: `/opt/transport_notice` แยกเป็นโฟลเดอร์ของตัวเองใต้ `/opt`
 
 ## พฤติกรรม
 
@@ -31,7 +31,7 @@
 Python 3.10+ และ MySQL ที่เข้าถึงได้:
 
 ```bash
-cd /opt/vehiclelog/transport_notice
+cd /opt/transport_notice
 python3 -m venv venv
 venv/bin/pip install -r requirements.txt
 cp .env.example .env   # สำหรับเครื่องใหม่เท่านั้น; ห้ามทับ .env เดิม
@@ -63,20 +63,16 @@ TRANSPORT_DB_TEST=1 venv/bin/python -m unittest discover -s tests
 
 ชุด MySQL ใช้ตาราง TEMPORARY เท่านั้น ไม่เปลี่ยนข้อมูลจริง ทดสอบลำดับ 1,2,3 การลบไม่ใช้เลขซ้ำ และวันใหม่เริ่ม 1
 
-## ย้ายไป /opt/transport_notice และรันอัตโนมัติ
+## รันอัตโนมัติด้วย systemd
 
 ส่วนนี้ต้องใช้บัญชีที่มีสิทธิ์ sudo และทำในช่วงหยุดใช้งาน:
 
 ```bash
-sudo install -d -o ubuntu1 -g ubuntu1 /opt/transport_notice
-rsync -a --exclude venv --exclude __pycache__ /opt/vehiclelog/transport_notice/ /opt/transport_notice/
 cd /opt/transport_notice
-python3 -m venv venv
-venv/bin/pip install -r requirements.txt
 # หยุด process เดิมที่ใช้พอร์ต 8606 ก่อนเปิด service
 sudo cp deploy/transport-notice.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now transport-notice
 ```
 
-`.env`, token, virtualenv และไฟล์บริษัทที่แนบไม่ขึ้น GitHub การเชื่อม GitHub ใช้ credential helper เฉพาะเครื่องใน `.runtime/` ซึ่งอ่าน token จากไฟล์ต้นทางที่ป้องกันสิทธิ์ไว้ ไม่ฝัง token ในหน้าเว็บหรือ source ระบบปัจจุบันไม่มี login จึงออกแบบให้ใช้งานในเครือข่ายสำนักงาน การเปิดใช้นอกสำนักงานยังไม่ได้จัดเตรียม
+`.env`, token, virtualenv และไฟล์บริษัทที่แนบไม่ขึ้น GitHub การเชื่อม GitHub ใช้ credential helper เฉพาะเครื่องและไฟล์ token ที่ป้องกันสิทธิ์ไว้ใน `.runtime/` ไม่ฝัง token ในหน้าเว็บหรือ source ระบบปัจจุบันไม่มี login จึงออกแบบให้ใช้งานในเครือข่ายสำนักงาน การเปิดใช้นอกสำนักงานยังไม่ได้จัดเตรียม
