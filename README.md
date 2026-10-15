@@ -7,7 +7,7 @@
 - ในเครือข่ายสำนักงาน: http://10.8.1.88:8606/
 - เปิด `transport-notice.code-workspace` ใน VS Code
 - ไฟล์แนบ: `attach_files_here/` — วางไฟล์ **All.xlsx** และฟอร์ม **ใบแจ้งงานขนส่ง SST.xlsx** ได้เลย
-- Source: private repository บน GitHub; ยังไม่ได้เผยแพร่ GitHub Pages หรือ API ภายนอก
+- Source: public repository บน GitHub; ยังไม่ได้เผยแพร่ GitHub Pages หรือ API ภายนอก
 
 ตำแหน่งโปรเจกต์: `/opt/transport_notice` แยกเป็นโฟลเดอร์ของตัวเองใต้ `/opt`
 
