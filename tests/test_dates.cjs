@@ -1,0 +1,10 @@
+const fs = require('node:fs');
+const vm = require('node:vm');
+const assert = require('node:assert/strict');
+const source = fs.readFileSync(require('node:path').join(__dirname, '../docs/js/app.js'), 'utf8');
+const context = vm.createContext({ console, Date, Intl, window: { matchMedia: () => ({}) } });
+vm.runInContext(source.replace(/init\(\);\s*$/, ''), context);
+assert.equal(vm.runInContext('bangkokISO(new Date("2026-10-15T16:59:59Z"))', context), '2026-10-15');
+assert.equal(vm.runInContext('bangkokISO(new Date("2026-10-15T17:00:00Z"))', context), '2026-10-16');
+assert.equal(vm.runInContext('addDays("2026-12-31", 1)', context), '2027-01-01');
+console.log('Thai midnight and calendar date checks passed');

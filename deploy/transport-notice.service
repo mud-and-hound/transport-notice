@@ -1,0 +1,15 @@
+[Unit]
+Description=SST Transport Notice
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=ubuntu1
+WorkingDirectory=/opt/transport_notice/backend
+ExecStart=/opt/transport_notice/venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8606
+Restart=on-failure
+RestartSec=5
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

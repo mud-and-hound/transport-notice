@@ -1,0 +1,22 @@
+# ---- ความลับ: ห้ามขึ้น GitHub เด็ดขาด ----
+.env
+github_token.txt
+*.token
+
+# ---- ไฟล์แนบ (All.xlsx, ฟอร์ม SST ฯลฯ) เก็บไว้ในเครื่องเท่านั้น ----
+attach_files_here/*
+!attach_files_here/README.md
+
+# ---- Python ----
+venv/
+__pycache__/
+*.pyc
+*.log
+.runtime/
+
+# ---- Editor / OS ----
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+.DS_Store
+Thumbs.db

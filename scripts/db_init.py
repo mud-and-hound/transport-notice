@@ -1,0 +1,33 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# =============================================================================
+#  db_init.py — สร้างตาราง transport_* ใน timemud (รันซ้ำได้)
+#  รัน:  ./venv/bin/python scripts/db_init.py
+# =============================================================================
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "backend"))
+from db import get_conn  # noqa: E402
+
+SQL_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sql", "001_schema.sql")
+
+
+def main():
+    with open(SQL_FILE, encoding="utf-8") as f:
+        # ตัดคอมเมนต์ทีละบรรทัดก่อน แล้วค่อยแยกคำสั่งด้วย ;
+        sql = "\n".join(line for line in f if not line.lstrip().startswith("--"))
+    statements = [s.strip() for s in sql.split(";") if s.strip()]
+    cn = get_conn()
+    try:
+        with cn.cursor() as cur:
+            for s in statements:
+                cur.execute(s)
+                print("OK:", s.split("(")[0].strip())
+        cn.commit()
+    finally:
+        cn.close()
+
+
+if __name__ == "__main__":
+    main()

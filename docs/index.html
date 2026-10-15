@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#1B2E4F">
+  <title>ใบแจ้งงานขนส่ง</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231B2E4F'/%3E%3Cg fill='none' stroke='%23D9B66A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 10h12v10H5z'/%3E%3Cpath d='M17 13h5l4 4v3h-9'/%3E%3Ccircle cx='9.5' cy='22.5' r='2'/%3E%3Ccircle cx='21.5' cy='22.5' r='2'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=Noto+Serif+Thai:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ===== หัวเว็บ ===== -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" id="brandMark"></span>
+      <div class="brand-text">
+        <h1>ใบแจ้งงานขนส่ง</h1>
+        <p>Transport Notice · SST</p>
+      </div>
+    </div>
+    <div class="top-tools">
+      <div class="seg seg-size" role="group" aria-label="ขนาดตัวอักษร">
+        <button type="button" data-size="1" aria-label="ตัวอักษรปกติ">ก</button>
+        <button type="button" data-size="2" aria-label="ตัวอักษรใหญ่">ก</button>
+        <button type="button" data-size="3" aria-label="ตัวอักษรใหญ่มาก">ก</button>
+      </div>
+      <div class="seg seg-view" role="group" aria-label="รูปแบบหน้าจอ">
+        <button type="button" data-view="desktop" id="viewDesktop"></button>
+        <button type="button" data-view="mobile" id="viewMobile"></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== แถบเครื่องมือ ===== -->
+  <section class="toolbar">
+    <div class="date-nav">
+      <button type="button" class="btn-icon" id="datePrev" aria-label="วันก่อนหน้า"></button>
+      <button type="button" class="date-current" id="dateCurrent"></button>
+      <button type="button" class="btn-icon" id="dateNext" aria-label="วันถัดไป"></button>
+      <button type="button" class="btn btn-ghost" id="dateToday">วันนี้</button>
+    </div>
+    <label class="search">
+      <span id="searchIcon"></span>
+      <input type="search" id="searchBox" placeholder="ค้นหา ชื่อ / สาขา / รหัสงาน / สิ่งที่ส่ง" autocomplete="off">
+    </label>
+    <div class="actions">
+      <button type="button" class="btn btn-gold" id="btnAdd"></button>
+      <button type="button" class="btn btn-ghost" id="btnPrint"></button>
+      <button type="button" class="btn btn-ghost" id="btnExcel"></button>
+      <button type="button" class="btn-icon" id="btnRefresh" aria-label="โหลดข้อมูลใหม่"></button>
+    </div>
+  </section>
+
+  <div class="banner" id="banner" hidden></div>
+
+  <div class="summary" id="summary"></div>
+
+  <!-- ===== เวอร์ชันคอม: ตารางแบบ Excel ===== -->
+  <main class="sheet-wrap" id="sheetWrap">
+    <table class="sheet" id="sheet">
+      <colgroup>
+        <col class="c-no"><col class="c-job"><col class="c-date"><col class="c-date">
+        <col class="c-name"><col class="c-dept"><col class="c-branch">
+        <col class="c-name"><col class="c-dept"><col class="c-branch">
+        <col class="c-item"><col class="c-qty"><col class="c-unit"><col class="c-remark"><col class="c-act">
+      </colgroup>
+      <thead>
+        <tr class="hg">
+          <th rowspan="2" class="sticky-1">ลำดับ</th>
+          <th rowspan="2" class="sticky-2">รหัสงาน<small>Job No.</small></th>
+          <th rowspan="2">วันที่ฝาก<small>(ว/ด/ป)</small></th>
+          <th rowspan="2">วันที่ส่ง<small>(ว/ด/ป)</small></th>
+          <th colspan="3" class="grp grp-to">ปลายทาง · ผู้รับ</th>
+          <th colspan="3" class="grp grp-from">ต้นทาง · ผู้ส่ง</th>
+          <th colspan="3" class="grp grp-item">สิ่งที่ส่ง</th>
+          <th rowspan="2">หมายเหตุ</th>
+          <th rowspan="2" class="th-act"></th>
+        </tr>
+        <tr class="hc">
+          <th class="col-to">ถึง (ผู้รับ)</th>
+          <th class="col-to">แผนก<small>(ปลายทาง)</small></th>
+          <th class="col-to">สาขา<small>(ปลายทาง)</small><i class="req">*</i></th>
+          <th class="col-from">จาก (ผู้ส่ง)<i class="req">*</i></th>
+          <th class="col-from">แผนก<small>(ผู้ส่ง)</small></th>
+          <th class="col-from">สาขา<small>(ผู้ส่ง)</small></th>
+          <th class="col-item">รายละเอียดสิ่งที่ส่ง<i class="req">*</i></th>
+          <th class="col-item">จำนวน</th>
+          <th class="col-item">หน่วย</th>
+        </tr>
+      </thead>
+      <tbody id="sheetBody"></tbody>
+    </table>
+  </main>
+
+  <!-- ===== เวอร์ชันมือถือ: การ์ด ===== -->
+  <main class="cards" id="cards"></main>
+  <button type="button" class="fab" id="fab"></button>
+
+  <!-- ===== ป๊อปอัพเลือกสาขา ===== -->
+  <div class="overlay" id="branchModal" hidden>
+    <div class="modal modal-branch" role="dialog" aria-modal="true" aria-labelledby="branchTitle">
+      <div class="modal-head">
+        <h2 id="branchTitle">เลือกสาขา</h2>
+        <button type="button" class="btn-icon" data-close aria-label="ปิด"></button>
+      </div>
+      <label class="search search-lg">
+        <span class="search-ic"></span>
+        <input type="search" id="branchSearch" placeholder="พิมพ์รหัส ชื่อสาขา หรือเลขสาขา เช่น PG, Paragon, 0004" autocomplete="off" enterkeyhint="search">
+      </label>
+      <div class="chips" id="branchBrands"></div>
+      <div class="branch-list" id="branchList" role="listbox"></div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" id="branchClear">ล้างค่าสาขา</button>
+        <button type="button" class="btn btn-ghost" data-close>ปิด</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ปฏิทิน ===== -->
+  <div class="overlay overlay-light" id="calModal" hidden>
+    <div class="modal modal-cal" role="dialog" aria-modal="true" aria-label="เลือกวันที่">
+      <div class="cal-head">
+        <button type="button" class="btn-icon" id="calPrev" aria-label="เดือนก่อน"></button>
+        <div class="cal-title" id="calTitle"></div>
+        <button type="button" class="btn-icon" id="calNext" aria-label="เดือนถัดไป"></button>
+      </div>
+      <div class="cal-grid cal-dow"><span>อา</span><span>จ</span><span>อ</span><span>พ</span><span>พฤ</span><span>ศ</span><span>ส</span></div>
+      <div class="cal-grid" id="calDays"></div>
+      <div class="cal-foot">
+        <button type="button" class="btn btn-ghost" id="calToday">วันนี้</button>
+        <button type="button" class="btn btn-ghost" id="calTomorrow">พรุ่งนี้</button>
+        <button type="button" class="btn btn-ghost" data-close>ปิด</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ฟอร์มกรอก (มือถือ) ===== -->
+  <div class="overlay" id="formModal" hidden>
+    <form class="modal modal-form" id="jobForm" role="dialog" aria-modal="true" aria-labelledby="formTitle" novalidate>
+      <div class="modal-head">
+        <h2 id="formTitle">เพิ่มรายการ</h2>
+        <button type="button" class="btn-icon" data-close aria-label="ปิด"></button>
+      </div>
+      <div class="form-body" id="formBody"></div>
+      <div class="modal-foot form-foot">
+        <button type="button" class="btn btn-danger-ghost" id="formDelete" hidden></button>
+        <button type="button" class="btn btn-ghost" data-close>ยกเลิก</button>
+        <button type="submit" class="btn btn-gold btn-lg" id="formSave"></button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ===== ยืนยัน ===== -->
+  <div class="overlay" id="confirmModal" hidden>
+    <div class="modal modal-confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+      <h2 id="confirmTitle"></h2>
+      <p id="confirmMsg"></p>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" id="confirmNo">ไม่ใช่</button>
+        <button type="button" class="btn btn-danger" id="confirmYes">ใช่</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="print-area" id="printArea"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
