@@ -5,7 +5,7 @@
 #
 #  รันที่ :8606 ภายในสำนักงาน
 #  หน้าเว็บจริงอยู่ที่ index.html ในรากโปรเจกต์ → เปิด http://10.8.1.88:8606 ได้เลย
-#  GitHub เก็บ source; ยังไม่ได้เปิด GitHub Pages หรือ public API
+#  GitHub เก็บ source และหน้าเว็บ Pages; API ฐานข้อมูลยังอยู่ในเครือข่ายสำนักงาน
 #
 #  รัน:  cd backend && ../venv/bin/uvicorn main:app --host 0.0.0.0 --port 8606
 #        (หรือ systemd — ดู transport-notice-api.service)

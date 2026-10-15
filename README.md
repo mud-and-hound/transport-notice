@@ -8,7 +8,8 @@
 - ไฟล์หน้าเว็บใช้งานจริง: [`index.html`](index.html) อยู่หน้าสุดของโปรเจกต์; CSS/JavaScript อยู่ใน `docs/`
 - เปิด `transport-notice.code-workspace` ใน VS Code
 - ได้รับ **All.xlsx** และ **ใบแจ้งงานขนส่ง SST.xlsx** แล้วใน `attach_files_here/`
-- Source: [public repository บน GitHub](https://github.com/mud-and-hound/transport-notice); ยังไม่ได้เผยแพร่ GitHub Pages หรือ API ภายนอก
+- Source: [public repository บน GitHub](https://github.com/mud-and-hound/transport-notice)
+- หน้าเว็บบน [GitHub Pages](https://mud-and-hound.github.io/transport-notice/) เปิดได้แล้วจาก `main /` แต่ยังไม่เชื่อม API ภายนอก จึงใช้ดูหน้าจอเท่านั้น; บันทึก/อ่านข้อมูลจริงผ่าน URL สำนักงานด้านบน
 
 ตำแหน่งโปรเจกต์: `/opt/transport_notice` แยกเป็นโฟลเดอร์ของตัวเองใต้ `/opt`
 
