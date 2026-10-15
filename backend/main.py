@@ -4,7 +4,7 @@
 #  main.py — ใบแจ้งงานขนส่ง (Transport Notice) API — FastAPI + MySQL (timemud)
 #
 #  รันที่ :8606 ภายในสำนักงาน
-#  หน้าเว็บ (โฟลเดอร์ docs/) ถูกเสิร์ฟที่ / ด้วย → ในออฟฟิศเปิด http://10.8.1.88:8606 ได้เลย
+#  หน้าเว็บจริงอยู่ที่ index.html ในรากโปรเจกต์ → เปิด http://10.8.1.88:8606 ได้เลย
 #  GitHub เก็บ source; ยังไม่ได้เปิด GitHub Pages หรือ public API
 #
 #  รัน:  cd backend && ../venv/bin/uvicorn main:app --host 0.0.0.0 --port 8606
@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -36,6 +36,7 @@ JOB_DIGITS = 4
 UNITS = ["กล่อง", "ซอง", "แพค", "ขวด", "ชิ้น"]
 QTY_MAX = 99_999
 DOCS_DIR = os.path.join(ROOT, "docs")
+INDEX_FILE = os.path.join(ROOT, "index.html")
 
 JOB_COLUMNS = [
     "id", "work_date", "seq", "job_no", "deposit_date", "delivery_date",
@@ -45,9 +46,10 @@ JOB_COLUMNS = [
 ]
 JOB_SELECT = "SELECT " + ", ".join(JOB_COLUMNS) + " FROM transport_jobs"
 
-app = FastAPI(title="Transport Notice API", version="1.0")
+app = FastAPI(title="Transport Notice API", version="1.1", docs_url="/api/docs",
+              redoc_url=None, openapi_url="/api/openapi.json")
 
-# หน้าเว็บอยู่บน GitHub Pages คนละ origin → เปิด CORS (ระบบนี้ไม่มี login/cookie)
+# รองรับเปิด index.html ในเครื่องร่วมกับ API ภายในสำนักงาน (ไม่มี login/cookie)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -121,7 +123,7 @@ class JobIn(BaseModel):
     @classmethod
     def _required(cls, v):
         if not v:
-            raise ValueError("กรุณากรอกสาขาปลายทาง ผู้ส่ง และรายละเอียดสิ่งที่ส่ง")
+            raise ValueError("กรุณากรอกสาขาปลายทาง ผู้ส่ง และรายละเอียด สิ่งที่ส่ง")
         return v
 
     @field_validator("unit")
@@ -156,11 +158,11 @@ def meta():
 
 @app.get("/api/branches")
 def branches():
-    # ส่งทั้งหมดครั้งเดียว (~1 พันแถว) ให้หน้าเว็บค้นหาเองแบบทันทีขณะพิมพ์
+    # ส่งรายชื่อจาก All Shop ให้หน้าเว็บค้นหาได้ทันทีขณะพิมพ์
     cn = get_conn()
     try:
         with cn.cursor() as cur:
-            cur.execute("SELECT brand, shop_id, code, name FROM transport_branches "
+            cur.execute("SELECT brand, shop_id, code, name, alternate_name FROM transport_branches "
                         "WHERE is_active=1 ORDER BY brand, code")
             items = cur.fetchall()
     finally:
@@ -263,10 +265,10 @@ def export_jobs(date: Optional[datetime.date] = None, q: str = ""):
                                    for t in tokens)]
     columns = [("ลำดับ", "seq", 8), ("รหัสงาน Job No.", "job_no", 18),
                ("วันที่ฝาก (ว/ด/ป)", "deposit_date", 20), ("วันที่ส่ง (ว/ด/ป)", "delivery_date", 20),
-               ("ถึง (ผู้รับ)", "to_name", 24), ("แผนก (ปลายทาง)", "to_dept", 24),
-               ("สาขา (ปลายทาง)", "to_branch_code", 22), ("จาก (ผู้ส่ง)", "from_name", 24),
-               ("แผนก (ผู้ส่ง)", "from_dept", 24), ("สาขา (ผู้ส่ง)", "from_branch_code", 22),
-               ("รายละเอียดสิ่งที่ส่ง", "item_detail", 40), ("จำนวน", "qty", 12),
+               ("ถึง ผู้รับ", "to_name", 24), ("แผนก ผู้รับ", "to_dept", 24),
+               ("สาขา ผู้รับ", "to_branch_code", 22), ("จาก ผู้ส่ง", "from_name", 24),
+               ("แผนก ผู้ส่ง", "from_dept", 24), ("สาขา ผู้ส่ง", "from_branch_code", 22),
+               ("รายละเอียด สิ่งที่ส่ง", "item_detail", 40), ("จำนวน", "qty", 12),
                ("หน่วย", "unit", 12), ("หมายเหตุ", "remark", 35)]
     wb = Workbook()
     ws = wb.active
@@ -305,6 +307,20 @@ def export_jobs(date: Optional[datetime.date] = None, q: str = ""):
                     headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"})
 
 
-# หน้าเว็บ (ต้อง mount ท้ายสุด ไม่งั้นจะทับ /api)
+# Serve the actual root index without exposing project files or .env.
+@app.get("/", include_in_schema=False)
+@app.get("/index.html", include_in_schema=False)
+def web_index():
+    return FileResponse(INDEX_FILE, media_type="text/html", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/docs/index.html", include_in_schema=False)
+def legacy_index():
+    return RedirectResponse("/", status_code=307)
+
+
 if os.path.isdir(DOCS_DIR):
-    app.mount("/", StaticFiles(directory=DOCS_DIR, html=True), name="web")
+    app.mount("/docs", StaticFiles(directory=DOCS_DIR), name="assets")
+    # Existing tabs may still request the old asset URLs until they reload.
+    app.mount("/css", StaticFiles(directory=os.path.join(DOCS_DIR, "css")), name="legacy-css")
+    app.mount("/js", StaticFiles(directory=os.path.join(DOCS_DIR, "js")), name="legacy-js")

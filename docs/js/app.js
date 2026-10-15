@@ -11,9 +11,9 @@ const QTY_MAX = 99999;
 const BRANCH_LIMIT = 60;
 const POLL_MS = 45000;
 const REQUIRED = [
-  ["to_branch_code", "สาขา (ปลายทาง)"],
-  ["from_name", "จาก (ผู้ส่ง)"],
-  ["item_detail", "รายละเอียดสิ่งที่ส่ง"],
+  ["to_branch_code", "สาขา ผู้รับ"],
+  ["from_name", "จาก ผู้ส่ง"],
+  ["item_detail", "รายละเอียด สิ่งที่ส่ง"],
 ];
 const FIELDS = [
   "deposit_date", "delivery_date",
@@ -32,13 +32,13 @@ const COLS = [
   { label: "รหัสงาน Job No.", w: 11, get: r => r.job_no },
   { label: "วันที่ฝาก (ว/ด/ป)", w: 12, get: r => fmtDate(r.deposit_date) },
   { label: "วันที่ส่ง (ว/ด/ป)", w: 12, get: r => fmtDate(r.delivery_date) },
-  { label: "ถึง (ผู้รับ)", w: 18, get: r => r.to_name, left: true },
-  { label: "แผนก (ปลายทาง)", w: 14, get: r => r.to_dept },
-  { label: "สาขา (ปลายทาง)", w: 12, get: r => r.to_branch_code },
-  { label: "จาก (ผู้ส่ง)", w: 14, get: r => r.from_name, from: true },
-  { label: "แผนก (ผู้ส่ง)", w: 14, get: r => r.from_dept, from: true },
-  { label: "สาขา (ผู้ส่ง)", w: 12, get: r => r.from_branch_code, from: true },
-  { label: "รายละเอียดสิ่งที่ส่ง", w: 30, get: r => r.item_detail, left: true },
+  { label: "ถึง ผู้รับ", w: 18, get: r => r.to_name, left: true },
+  { label: "แผนก ผู้รับ", w: 14, get: r => r.to_dept },
+  { label: "สาขา ผู้รับ", w: 12, get: r => r.to_branch_code },
+  { label: "จาก ผู้ส่ง", w: 14, get: r => r.from_name, from: true },
+  { label: "แผนก ผู้ส่ง", w: 14, get: r => r.from_dept, from: true },
+  { label: "สาขา ผู้ส่ง", w: 12, get: r => r.from_branch_code, from: true },
+  { label: "รายละเอียด สิ่งที่ส่ง", w: 30, get: r => r.item_detail, left: true },
   { label: "จำนวน", w: 8, get: r => Number(r.qty) },
   { label: "หน่วย", w: 8, get: r => r.unit },
   { label: "หมายเหตุ", w: 20, get: r => r.remark, left: true },
@@ -225,7 +225,7 @@ async function loadBranches() {
 
 function indexBranches() {
   for (const b of S.branches) {
-    b._s = { code: b.code.toLowerCase(), name: b.name.toLowerCase(), shop: String(b.shop_id).toLowerCase(), brand: b.brand.toLowerCase() };
+    b._s = { code: b.code.toLowerCase(), name: b.name.toLowerCase(), alternate: (b.alternate_name || "").toLowerCase(), shop: String(b.shop_id).toLowerCase(), brand: b.brand.toLowerCase() };
   }
 }
 
@@ -234,6 +234,14 @@ function indexBranches() {
 // =============================================================================
 function rowKey(r) { return r.id ? "j" + r.id : r._key; }
 function rowEl(r) { return document.querySelector(`#sheetBody tr[data-key="${rowKey(r)}"]`); }
+
+function refreshDraftBranch(r, side) {
+  const branch = S.branches.find(b => b.brand === r[side + "_brand"] && b.shop_id === r[side + "_shop_id"]);
+  r[side + "_branch_code"] = branch?.code || "";
+  r[side + "_branch_name"] = branch?.name || "";
+  r[side + "_brand"] = branch?.brand || "";
+  r[side + "_shop_id"] = branch?.shop_id || "";
+}
 
 function blankRow() {
   const r = {
@@ -246,12 +254,15 @@ function blankRow() {
   // จำผู้ส่งล่าสุดของเครื่องนี้ไว้ให้ ไม่ต้องพิมพ์ซ้ำทุกแถว
   const sender = store.get("sender", {});
   for (const f of SENDER_FIELDS) if (sender[f]) r[f] = sender[f];
+  refreshDraftBranch(r, "from");
   return r;
 }
 
 function copyRow(src) {
   const r = blankRow();
   for (const f of FIELDS) r[f] = src[f];
+  refreshDraftBranch(r, "to");
+  refreshDraftBranch(r, "from");
   if (r.deposit_date < S.today) r.deposit_date = S.today;
   if (r.delivery_date < S.today) r.delivery_date = S.today;
   return r;
@@ -346,13 +357,13 @@ function sheetRow(r, no) {
     h("td", { class: "td-job sticky-2" }, draft ? h("span", { class: "draft-tag" }, "ใหม่") : r.job_no),
     tdDate(r, "deposit_date", "วันที่ฝาก"),
     tdDate(r, "delivery_date", "วันที่ส่ง"),
-    tdText(r, "to_name", "ถึง (ผู้รับ)", 150),
-    tdText(r, "to_dept", "แผนก (ปลายทาง)", 150),
-    tdBranch(r, "to", "สาขา (ปลายทาง)"),
-    tdText(r, "from_name", "จาก (ผู้ส่ง)", 150),
-    tdText(r, "from_dept", "แผนก (ผู้ส่ง)", 150),
-    tdBranch(r, "from", "สาขา (ผู้ส่ง)"),
-    tdText(r, "item_detail", "รายละเอียดสิ่งที่ส่ง", 500),
+    tdText(r, "to_name", "ถึง ผู้รับ", 150),
+    tdText(r, "to_dept", "แผนก ผู้รับ", 150),
+    tdBranch(r, "to", "สาขา ผู้รับ"),
+    tdText(r, "from_name", "จาก ผู้ส่ง", 150),
+    tdText(r, "from_dept", "แผนก ผู้ส่ง", 150),
+    tdBranch(r, "from", "สาขา ผู้ส่ง"),
+    tdText(r, "item_detail", "รายละเอียด สิ่งที่ส่ง", 500),
     h("td", { "data-f": "qty" }, stepper(r, () => changed(r))),
     h("td", { "data-f": "unit" }, unitSelect(r, "cell-in", () => changed(r))),
     tdText(r, "remark", "หมายเหตุ", 500),
@@ -696,15 +707,15 @@ function buildForm(r) {
       h("div", { class: "fgrid fgrid-2" }, fDate(r, "deposit_date", "วันที่ฝาก"), fDate(r, "delivery_date", "วันที่ส่ง"))),
     h("section", { class: "fsec to" }, h("h3", null, ico("map-pin"), "ปลายทาง · ผู้รับ"),
       h("div", { class: "fgrid" },
-        fText(r, "to_name", "ถึง (ผู้รับ)"), fText(r, "to_dept", "แผนก (ปลายทาง)"),
-        fBranch(r, "to", "สาขา (ปลายทาง)", { req: true }))),
+        fText(r, "to_name", "ถึง ผู้รับ"), fText(r, "to_dept", "แผนก ผู้รับ"),
+        fBranch(r, "to", "สาขา ผู้รับ", { req: true }))),
     h("section", { class: "fsec from" }, h("h3", null, ico("circle-user"), "ต้นทาง · ผู้ส่ง"),
       h("div", { class: "fgrid" },
-        fText(r, "from_name", "จาก (ผู้ส่ง)", { req: true }), fText(r, "from_dept", "แผนก (ผู้ส่ง)"),
-        fBranch(r, "from", "สาขา (ผู้ส่ง)"))),
+        fText(r, "from_name", "จาก ผู้ส่ง", { req: true }), fText(r, "from_dept", "แผนก ผู้ส่ง"),
+        fBranch(r, "from", "สาขา ผู้ส่ง"))),
     h("section", { class: "fsec item" }, h("h3", null, ico("truck"), "สิ่งที่ส่ง"),
       h("div", { class: "fgrid" },
-        fText(r, "item_detail", "รายละเอียดสิ่งที่ส่ง", { req: true, full: true, area: true, max: 500 }),
+        fText(r, "item_detail", "รายละเอียด สิ่งที่ส่ง", { req: true, full: true, area: true, max: 500 }),
         field("qty", "จำนวน", stepper(r, () => {}, true)),
         field("unit", "หน่วย", unitSelect(r, "f-in", () => {})),
         fText(r, "remark", "หมายเหตุ", { full: true, area: true, max: 500 }))),
@@ -823,6 +834,7 @@ function scoreBranch(b, toks) {
     else if (s.name.startsWith(t)) sc = 60;
     else if (s.name.includes(" " + t)) sc = 55;
     else if (s.name.includes(t)) sc = 40;
+    else if (s.alternate.includes(t)) sc = 38;
     else if (s.code.includes(t)) sc = 35;
     else if (s.shop.includes(t)) sc = 25;
     else if (s.brand === t) sc = 20;
@@ -834,7 +846,8 @@ function scoreBranch(b, toks) {
 
 function recentBranches() {
   const rec = store.get("recent", []);
-  return Array.isArray(rec) ? rec.filter(b => b && b.code) : [];
+  if (!Array.isArray(rec)) return [];
+  return rec.filter(Boolean).map(b => S.branches.find(current => current.brand === b.brand && current.shop_id === b.shop_id)).filter(Boolean);
 }
 
 function addRecent(b) {
@@ -869,12 +882,6 @@ function renderBranchList() {
     nodes.push(h("div", { class: "bl-more" }, `แสดง ${BRANCH_LIMIT} จาก ${results.length} สาขา — พิมพ์เพิ่มเพื่อค้นหาให้แคบลง`));
   }
   if (toks.length && !results.length) nodes.push(h("div", { class: "bl-more" }, "ไม่พบสาขาที่ค้นหา"));
-  // สาขาที่ยังไม่มีในรายชื่อ → ใช้ตามที่พิมพ์ได้
-  if (toks.length && !results.some(b => b._s && b._s.code === toks.join(" "))) {
-    const code = raw.toUpperCase().slice(0, 30);
-    nodes.push(h("button", { type: "button", class: "bl-item bl-free", onclick: () => pickBranch({ code, name: "", brand: "", shop_id: "" }) },
-      h("span", { class: "bl-code" }, code), h("span", { class: "bl-name" }, "ไม่มีในรายชื่อ? ใช้รหัสนี้ตามที่พิมพ์")));
-  }
 
   list.replaceChildren(...nodes);
   list.scrollTop = 0;

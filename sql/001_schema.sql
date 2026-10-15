@@ -5,13 +5,14 @@
 --  รันซ้ำได้ (IF NOT EXISTS)
 -- =============================================================================
 
--- สาขา (นำเข้าจากไฟล์ All → Sheet Shop)
+-- สาขา (นำเข้าจากไฟล์ All → Sheet All Shop)
 CREATE TABLE IF NOT EXISTS transport_branches (
   id          INT          NOT NULL AUTO_INCREMENT,
   brand       VARCHAR(10)  NOT NULL,
   shop_id     VARCHAR(20)  NOT NULL,
   code        VARCHAR(30)  NOT NULL,
   name        VARCHAR(255) NOT NULL,
+  alternate_name VARCHAR(255) NOT NULL DEFAULT '',
   is_active   TINYINT(1)   NOT NULL DEFAULT 1,
   updated_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),

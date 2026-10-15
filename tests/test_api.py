@@ -13,6 +13,21 @@ import main
 
 
 class TransportTests(unittest.TestCase):
+    def test_real_index_at_project_root_and_private_files_not_served(self):
+        with TestClient(main.app) as client:
+            home = client.get('/')
+            self.assertEqual(home.status_code, 200)
+            self.assertIn('src="docs/js/app.js"', home.text)
+            self.assertEqual(home.content, (Path(main.ROOT) / 'index.html').read_bytes())
+            self.assertEqual(client.get('/index.html').content, home.content)
+            legacy = client.get('/docs/index.html', follow_redirects=False)
+            self.assertEqual(legacy.status_code, 307)
+            self.assertEqual(legacy.headers['location'], '/')
+            for asset in ['/docs/css/style.css', '/docs/js/app.js', '/docs/js/config.js', '/docs/js/icons.js']:
+                self.assertEqual(client.get(asset).status_code, 200, asset)
+            for private_path in ['/.env', '/backend/db.py', '/attach_files_here/All.xlsx', '/.runtime/github_token.txt']:
+                self.assertEqual(client.get(private_path).status_code, 404, private_path)
+
     def test_required_fields_rejected_by_api_schema(self):
         with self.assertRaises(ValidationError):
             main.JobIn(deposit_date='2026-10-15', delivery_date='2026-10-15')
@@ -29,6 +44,10 @@ class TransportTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 ws = load_workbook(io.BytesIO(response.content)).active
                 self.assertEqual(ws.max_row, 2)
+                self.assertEqual([c.value for c in ws[1]], [
+                    'ลำดับ', 'รหัสงาน Job No.', 'วันที่ฝาก (ว/ด/ป)', 'วันที่ส่ง (ว/ด/ป)',
+                    'ถึง ผู้รับ', 'แผนก ผู้รับ', 'สาขา ผู้รับ', 'จาก ผู้ส่ง', 'แผนก ผู้ส่ง',
+                    'สาขา ผู้ส่ง', 'รายละเอียด สิ่งที่ส่ง', 'จำนวน', 'หน่วย', 'หมายเหตุ'])
                 self.assertEqual(ws['A2'].value, 7)
                 self.assertEqual(ws['L2'].value, 21)
                 self.assertEqual(ws['N2'].value, '=1+1')

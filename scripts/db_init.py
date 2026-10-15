@@ -24,6 +24,12 @@ def main():
             for s in statements:
                 cur.execute(s)
                 print("OK:", s.split("(")[0].strip())
+            # อัปเกรดฐานข้อมูลเดิม โดยคงข้อมูลสาขาและประวัติใบแจ้งงานไว้
+            cur.execute("SHOW COLUMNS FROM transport_branches LIKE 'alternate_name'")
+            if not cur.fetchone():
+                cur.execute("ALTER TABLE transport_branches ADD COLUMN "
+                            "alternate_name VARCHAR(255) NOT NULL DEFAULT '' AFTER name")
+                print("OK: added branch alternate_name")
         cn.commit()
     finally:
         cn.close()
