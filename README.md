@@ -79,4 +79,4 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now transport-notice
 ```
 
-`.env`, token, virtualenv และไฟล์บริษัทที่แนบไม่ขึ้น GitHub การเชื่อม GitHub ใช้ credential cache ของเครื่อง ไม่ฝัง token ในหน้าเว็บหรือ source ระบบปัจจุบันไม่มี login จึงออกแบบให้ใช้งานในเครือข่ายสำนักงาน การเปิดใช้นอกสำนักงานยังไม่ได้จัดเตรียม
+`.env`, token, virtualenv และไฟล์บริษัทที่แนบไม่ขึ้น GitHub การเชื่อม GitHub ใช้ credential helper เฉพาะเครื่องใน `.runtime/` ซึ่งอ่าน token จากไฟล์ต้นทางที่ป้องกันสิทธิ์ไว้ ไม่ฝัง token ในหน้าเว็บหรือ source ระบบปัจจุบันไม่มี login จึงออกแบบให้ใช้งานในเครือข่ายสำนักงาน การเปิดใช้นอกสำนักงานยังไม่ได้จัดเตรียม

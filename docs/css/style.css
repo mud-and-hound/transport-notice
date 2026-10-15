@@ -135,6 +135,7 @@ button { cursor: pointer; }
 .date-current .is-today { font-size: .78rem; font-weight: 700; color: #fff; background: var(--gold); border-radius: 999px; padding: .05rem .55rem; }
 
 .search {
+  min-width: 0;
   flex: 1 1 18rem; display: flex; align-items: center; gap: .5rem;
   min-height: 2.75rem; padding: 0 1rem;
   border-radius: 999px; border: 1.5px solid var(--line-2); background: var(--paper); color: var(--muted);
@@ -447,7 +448,8 @@ body.view-mobile .toast { bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
   .seg button .lbl { display: none; }
   .toolbar { padding: .85rem 1rem .4rem; }
   .date-nav { width: 100%; }
-  .date-current { flex: 1; justify-content: center; padding-inline: .5rem; }
+  .date-nav .btn-icon { flex-shrink: 0; }
+  .date-current { flex: 1; min-width: 0; justify-content: center; padding-inline: .5rem; }
   .toolbar .search { flex-basis: 100%; }
   .actions { width: 100%; }
   .actions .btn-ghost { flex: 1; }
@@ -461,6 +463,12 @@ body.view-mobile .toast { bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
   .fgrid.fgrid-2 { grid-template-columns: 1fr 1fr; gap: .5rem; }
   .fgrid-2 .f-btn { padding-inline: .6rem; gap: .35rem; }
   .modal-foot { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+}
+
+@media (max-width: 400px) {
+  .date-current .is-today { display: none; }
+  html[data-size="3"] .card-act { flex-wrap: wrap; }
+  html[data-size="3"] .card-act .del { flex: 1 1 100%; }
 }
 
 /* =============================================================================
