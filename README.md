@@ -26,7 +26,7 @@
 - จำนวนพิมพ์หรือกด +/− ได้ ตั้งแต่ 1–99,999 หน่วยมี กล่อง/ซอง/แพค/ขวด/ชิ้น
 - ตารางคอมบันทึกการแก้ไขอัตโนมัติ แถวใหม่กดบันทึก มือถือใช้ฟอร์มกดบันทึก
 - ค้นหา พิมพ์ A4 แนวนอน และส่งออก `.xlsx` จริง (14 คอลัมน์ ตามรายการที่กรอง)
-- ฐานข้อมูล `timemud`: `transport_jobs`, `transport_daily_counter`, `transport_branches` แยกจากตารางเดิม เช่น `audit_logs`
+- ฐานข้อมูลของโปรเจกต์ชื่อ `transport_notice` มีตาราง `transport_jobs`, `transport_daily_counter`, `transport_branches`
 - รายการเลือกสาขาใช้ **124 รายการ** จาก **All.xlsx → All Shop**; ใช้ Shop Code เป็นเลขอ้างอิงและรักษาศูนย์นำหน้า เช่น `0004`
 - เก็บ Shop Name 1 เป็นชื่อหลัก และ Shop name 2 สำหรับค้นหาเพิ่มเติม โดยคงรายการ Closed/Close และรายการชื่อ `-` ตามต้นฉบับ
 - ประวัติใบแจ้งงานเก็บชื่อ/รหัสสาขาตอนบันทึก จึงไม่เปลี่ยนตามการนำเข้ารายชื่อสาขาใหม่
@@ -34,6 +34,18 @@
 ## ติดตั้ง / รัน
 
 Python 3.10+ และ MySQL ที่เข้าถึงได้:
+
+สำหรับติดตั้งใหม่ ให้ผู้ดูแล MySQL สร้างฐานข้อมูลและบัญชีของโปรเจกต์ก่อน โดยเปลี่ยนรหัสผ่านตัวอย่างเป็นรหัสผ่านจริง:
+
+```sql
+CREATE DATABASE IF NOT EXISTS transport_notice
+  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'transport_notice'@'localhost' IDENTIFIED BY 'REPLACE_WITH_A_STRONG_PASSWORD';
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, CREATE TEMPORARY TABLES
+  ON transport_notice.* TO 'transport_notice'@'localhost';
+```
+
+ตัวอย่างนี้ใช้แอปกับ MySQL บนเครื่องเดียวกัน หาก MySQL อยู่คนละเครื่อง ให้ผู้ดูแลกำหนด host ของบัญชีให้ตรงกับเครื่องแอป และตั้ง `DB_HOST` ให้ตรงกับเซิร์ฟเวอร์ MySQL ค่าเริ่มต้นใน `.env.example` คือ `DB_NAME=transport_notice` และ `DB_USER=transport_notice`
 
 ```bash
 cd /opt/transport_notice
