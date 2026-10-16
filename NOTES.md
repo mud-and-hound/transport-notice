@@ -12,15 +12,15 @@
 | GitHub Pages | https://mud-and-hound.github.io/transport-notice/ — เรียก API ผ่าน `https://transport-notice.mobile1234.site/api` (ต้องใส่รหัสเข้าใช้งานครั้งแรก) — **รอเปิด Tunnel** |
 | Cloudflare Tunnel | ชื่อ `transport_notice` (`5a73f48c-…`), config `~/.cloudflared/transport-notice.yml` → `localhost:8606` |
 | รหัสเข้าใช้งาน | `ACCESS_KEY` ใน `.env` — ใช้เฉพาะคำขอที่มาทางอินเทอร์เน็ต ในออฟฟิศไม่ต้องใช้ |
-| ฐานข้อมูล | MySQL `timemud` บน 10.8.1.88 (phpMyAdmin พอร์ต 81) |
+| ฐานข้อมูล | MySQL **`transport_notice`** (ฐานข้อมูลเฉพาะโปรเจกต์) บน 10.8.1.88 (phpMyAdmin พอร์ต 81) |
 | ตารางของโปรเจกต์ | `transport_notice_jobs`, `transport_notice_daily_counter`, `transport_notice_branches` |
 | ไฟล์แนบ | `attach_files_here/All.xlsx`, `attach_files_here/ใบแจ้งงานขนส่ง SST.xlsx` (ไม่ขึ้น GitHub) |
 
 ## กติกาที่ต้องยึด
 
-- **ฐานข้อมูลต้องอยู่ใน `timemud` เท่านั้น** ห้ามแยกไปสร้างฐานข้อมูลใหม่
-- **ทุกตารางต้องขึ้นต้นด้วย `transport_notice_`** ให้ตรงชื่อโปรเจกต์ และไม่ชนกับตารางเดิมของ TimeMud (`audit_logs`, `users`, `branches`, …)
-- ห้ามแก้/ลบตารางอื่นของ TimeMud
+- **ฐานข้อมูลของโปรเจกต์คือ `transport_notice`** แยกจาก `timemud` — ห้ามเอาตารางไปไว้ใน `timemud`
+- **ทุกตารางขึ้นต้นด้วย `transport_notice_`** ตามชื่อโปรเจกต์
+- ห้ามแก้/ลบตารางของ TimeMud (`audit_logs`, `users`, `branches`, …)
 - `.env`, token GitHub (`.runtime/`), `venv/` และไฟล์ใน `attach_files_here/` ไม่ขึ้น GitHub
 
 ## ไทม์ไลน์
@@ -46,8 +46,8 @@
 
 ### 16 ต.ค. 2026
 
-7. **09:07 (Codex — ผิดจากที่สั่ง)** ย้าย 3 ตารางออกจาก `timemud` ไปฐานข้อมูลใหม่ชื่อ `transport_notice` (`0a489fc`)
-8. **09:11 (Claude) แก้กลับ** ตามที่ผู้ใช้สั่ง
+7. **09:07 (Codex — ถูกต้องตามที่ผู้ใช้ต้องการ)** ย้าย 3 ตารางออกจาก `timemud` ไปฐานข้อมูลใหม่ชื่อ `transport_notice` (`0a489fc`)
+8. **09:11 (Claude — ตีความคำสั่งผิด)** อ่าน "สร้างใน timemud ทำไม เอาออกเลยนะ" ผิดเป็น "ให้อยู่ใน timemud" จึงย้ายกลับ
    - ย้ายตารางกลับเข้า `timemud` ด้วย `RENAME TABLE` (ไม่คัดลอก/ไม่สูญข้อมูล) และเปลี่ยนชื่อให้ตรงโปรเจกต์:
      - `transport_branches` → `transport_notice_branches` (1,057 แถว, ใช้งาน 124 สาขา)
      - `transport_daily_counter` → `transport_notice_daily_counter` (1 แถว)
@@ -64,6 +64,14 @@
    - สร้าง Cloudflare Tunnel `transport_notice` + config `~/.cloudflared/transport-notice.yml` + ไฟล์ `deploy/cloudflared-transport-notice.service`
    - ⚠️ คำสั่ง `route dns` ครั้งแรกไปผูก DNS กับ tunnel `mobile_dashboard` (เพราะ cloudflared อ่าน `~/.cloudflared/config.yml` เป็นค่าเริ่มต้น) ต้องสั่งซ้ำพร้อม `--config` และ `--overwrite-dns` — ระบบสิทธิ์อัตโนมัติไม่ให้ Claude ทำขั้นนี้และขั้นเปิด tunnel
 
+10. **09:35 (Claude) แก้ตามที่ผู้ใช้ยืนยันจากหน้า phpMyAdmin** — ฐานข้อมูลต้องเป็น `transport_notice`
+   - แก้โค้ด/ค่าเริ่มต้น (`backend/db.py`, `.env.example`, `sql/`, `scripts/`) ให้ใช้ฐานข้อมูล `transport_notice` ชื่อตารางคง `transport_notice_*`
+   - สคริปต์ย้ายตารางจาก `timemud` → `transport_notice` (backup + ตรวจทุกแถว + ย้อนกลับอัตโนมัติถ้าพลาด) ระบบสิทธิ์ไม่ให้ Claude รัน ผู้ใช้จึงรันเอง
+   - รอบแรกล้มเหลวตอนเชื่อม MySQL เพราะ MySQL ถูก OOM killer หยุดตอน 10:04 (RAM เครื่องเต็ม ไม่มี swap) — ไม่มีข้อมูลเปลี่ยน
+11. **10:30 ย้ายสำเร็จ** ตารางทั้ง 3 อยู่ใน `transport_notice` แล้ว (1,057 สาขา / ใช้งาน 124, ตัวนับ 1, ใบแจ้งงาน 14) ข้อมูลและโครงสร้างตรงกันทุกแถว `timemud` เหลือเฉพาะตารางของ TimeMud
+   - `.env` → `DB_NAME=transport_notice` เว็บรีสตาร์ทแล้ว ตรวจ health / รายการงาน / ส่งออก Excel / รหัสเข้าใช้งาน / ทดสอบ MySQL จริง ผ่าน
+   - Backup: `.runtime/database-backups/20261016-103002-to-transport_notice/`
+
 ## ยังค้าง / ต้องทำต่อ
 
 - [ ] **เปิด Tunnel ให้ GitHub Pages ใช้งานได้** — รันเองใน Terminal:
@@ -74,6 +82,6 @@
   sudo cp /opt/transport_notice/deploy/cloudflared-transport-notice.service /etc/systemd/system/
   sudo systemctl daemon-reload && sudo systemctl enable --now cloudflared-transport-notice
   ```
-- [ ] ลบฐานข้อมูลว่าง `transport_notice` ใน phpMyAdmin (ไม่มีตารางแล้ว — สิทธิ์อัตโนมัติไม่อนุญาตให้ Claude ลบเอง)
 - [ ] ติดตั้ง systemd (`deploy/transport-notice.service`) ต้องใช้ sudo — ตอนนี้เว็บรันเป็น process ธรรมดา ถ้าเครื่องรีบูตต้องสั่ง `bash scripts/start.sh` เอง
 - [ ] ระบบยังไม่มี login รายคน — ทางอินเทอร์เน็ตกันด้วยรหัสเข้าใช้งานร่วมกัน 1 รหัส ถ้ารหัสหลุดให้เปลี่ยน `ACCESS_KEY` ใน `.env` แล้วรีสตาร์ทเว็บ
+- [ ] RAM เครื่อง 10.8.1.88 เกือบเต็ม (15 GB ใช้ 13 GB, ไม่มี swap) จน MySQL ถูก OOM killer หยุด 1 ครั้ง (16 ต.ค. 10:04) — ปิด VS Code server เวอร์ชันเก่าที่ค้าง หรือเพิ่ม swap

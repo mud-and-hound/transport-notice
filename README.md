@@ -27,7 +27,7 @@
 - จำนวนพิมพ์หรือกด +/− ได้ ตั้งแต่ 1–99,999 หน่วยมี กล่อง/ซอง/แพค/ขวด/ชิ้น
 - ตารางคอมบันทึกการแก้ไขอัตโนมัติ แถวใหม่กดบันทึก มือถือใช้ฟอร์มกดบันทึก
 - ค้นหา พิมพ์ A4 แนวนอน และส่งออก `.xlsx` จริง (14 คอลัมน์ ตามรายการที่กรอง)
-- ฐานข้อมูล `timemud` (ร่วมกับตารางเดิม เช่น `audit_logs`) ตารางของโปรเจกต์นี้ขึ้นต้นด้วยชื่อโปรเจกต์ทั้งหมด: `transport_notice_jobs`, `transport_notice_daily_counter`, `transport_notice_branches`
+- ฐานข้อมูลเฉพาะโปรเจกต์ชื่อ `transport_notice` (แยกจาก `timemud`) มีตาราง `transport_notice_jobs`, `transport_notice_daily_counter`, `transport_notice_branches`
 - รายการเลือกสาขาใช้ **124 รายการ** จาก **All.xlsx → All Shop**; ใช้ Shop Code เป็นเลขอ้างอิงและรักษาศูนย์นำหน้า เช่น `0004`
 - เก็บ Shop Name 1 เป็นชื่อหลัก และ Shop name 2 สำหรับค้นหาเพิ่มเติม โดยคงรายการ Closed/Close และรายการชื่อ `-` ตามต้นฉบับ
 - ประวัติใบแจ้งงานเก็บชื่อ/รหัสสาขาตอนบันทึก จึงไม่เปลี่ยนตามการนำเข้ารายชื่อสาขาใหม่
@@ -36,7 +36,13 @@
 
 Python 3.10+ และ MySQL ที่เข้าถึงได้:
 
-ใช้ฐานข้อมูล `timemud` และบัญชี `timemud` ที่มีอยู่แล้ว (ค่าเริ่มต้นใน `.env.example`) — `db_init.py` สร้างเฉพาะตาราง `transport_notice_*` ไม่แตะตารางอื่นของ TimeMud
+ใช้ฐานข้อมูล `transport_notice` (ค่าเริ่มต้นใน `.env.example`) เครื่องนี้เชื่อมด้วยบัญชี MySQL `timemud` ที่ได้สิทธิ์บน `transport_notice.*` แล้ว — `db_init.py` สร้างเฉพาะตาราง `transport_notice_*` สำหรับเครื่องใหม่ ให้ผู้ดูแล MySQL สร้างฐานข้อมูลและให้สิทธิ์ก่อน:
+
+```sql
+CREATE DATABASE IF NOT EXISTS transport_notice CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, CREATE TEMPORARY TABLES
+  ON transport_notice.* TO 'timemud'@'localhost';
+```
 
 ```bash
 cd /opt/transport_notice

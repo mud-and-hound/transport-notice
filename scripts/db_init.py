@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # =============================================================================
-#  db_init.py — สร้างตาราง transport_notice_* ใน timemud (รันซ้ำได้)
+#  db_init.py — สร้างตาราง transport_notice_* ในฐานข้อมูล transport_notice (รันซ้ำได้)
 #  รัน:  ./venv/bin/python scripts/db_init.py
 # =============================================================================
 import os

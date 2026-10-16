@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # =============================================================================
-#  main.py — ใบแจ้งงานขนส่ง (Transport Notice) API — FastAPI + MySQL (timemud)
+#  main.py — ใบแจ้งงานขนส่ง (Transport Notice) API — FastAPI + MySQL (transport_notice)
 #
 #  รันที่ :8606 ภายในสำนักงาน
 #  หน้าเว็บจริงอยู่ที่ index.html ในรากโปรเจกต์ → เปิด http://10.8.1.88:8606 ได้เลย
