@@ -5,7 +5,8 @@
 #
 #  รันที่ :8606 ภายในสำนักงาน
 #  หน้าเว็บจริงอยู่ที่ index.html ในรากโปรเจกต์ → เปิด http://10.8.1.88:8606 ได้เลย
-#  GitHub เก็บ source และหน้าเว็บ Pages; API ฐานข้อมูลยังอยู่ในเครือข่ายสำนักงาน
+#  GitHub Pages เรียก API ผ่าน Cloudflare Tunnel https://transport-notice.mobile1234.site
+#  คำขอที่มาทาง Tunnel ต้องมีรหัสเข้าใช้งาน (ACCESS_KEY ใน .env); ในออฟฟิศไม่ต้องใช้รหัส
 #
 #  รัน:  cd backend && ../venv/bin/uvicorn main:app --host 0.0.0.0 --port 8606
 #        (หรือ systemd — ดู transport-notice-api.service)
@@ -13,8 +14,10 @@
 #  เลขงาน: ลำดับ/Job No. เริ่ม 1 ใหม่ทุกเที่ยงคืน (เวลาไทย) → TP-0001, TP-0002, ...
 # =============================================================================
 import datetime
+import hmac
 import logging
 import os
+import re
 from io import BytesIO
 from urllib.parse import quote
 from typing import Optional
@@ -48,6 +51,29 @@ JOB_SELECT = "SELECT " + ", ".join(JOB_COLUMNS) + " FROM transport_notice_jobs"
 
 app = FastAPI(title="Transport Notice API", version="1.1", docs_url="/api/docs",
               redoc_url=None, openapi_url="/api/openapi.json")
+
+
+def _norm_key(value):
+    # ผู้ใช้พิมพ์ตัวเล็ก/เว้นวรรค/ขีดได้ เช่น "k7qm 4xpa r2ht" = "K7QM-4XPA-R2HT"
+    return re.sub(r"[\s-]", "", value or "").upper()
+
+
+ACCESS_KEY = _norm_key(os.environ.get("ACCESS_KEY"))
+
+
+# คำขอผ่าน Cloudflare Tunnel (มี header CF-Connecting-IP) = มาจากอินเทอร์เน็ต → ต้องมีรหัส
+# ประกาศก่อน CORSMiddleware เพื่อให้ CORS ห่อด้านนอก: preflight ผ่าน และ 401 มี CORS header
+@app.middleware("http")
+async def require_access_key(request: Request, call_next):
+    if (request.url.path.startswith("/api/") and request.method != "OPTIONS"
+            and "cf-connecting-ip" in request.headers):
+        given = _norm_key(request.headers.get("x-access-key"))
+        if not (ACCESS_KEY and hmac.compare_digest(given.encode(), ACCESS_KEY.encode())):
+            return JSONResponse(status_code=401, content={
+                "ok": False, "need_key": True,
+                "error": "รหัสเข้าใช้งานไม่ถูกต้อง" if given else "กรุณาใส่รหัสเข้าใช้งาน"})
+    return await call_next(request)
+
 
 # รองรับเปิด index.html ในเครื่องร่วมกับ API ภายในสำนักงาน (ไม่มี login/cookie)
 app.add_middleware(

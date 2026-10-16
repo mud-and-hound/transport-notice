@@ -152,18 +152,59 @@ function hl(text, toks) {
 // =============================================================================
 //  API
 // =============================================================================
-async function api(path, opts = {}) {
+// เปิดผ่านอินเทอร์เน็ต (GitHub Pages) เซิร์ฟเวอร์จะตอบ 401 need_key → ถามรหัสครั้งเดียวแล้วจำไว้ในเครื่อง
+// ในออฟฟิศ (10.8.1.88:8606) เซิร์ฟเวอร์ไม่ขอรหัส จึงไม่เห็นป๊อปอัพนี้
+async function apiFetch(path, init = {}) {
   if (!API_BASE) throw new Error("ยังไม่ได้ตั้งค่าที่อยู่เซิร์ฟเวอร์ กรุณาเปิดเว็บผ่านเซิร์ฟเวอร์ในสำนักงาน");
-  let res;
-  try {
-    res = await fetch(API_BASE + path, {
-      method: opts.method || "GET",
-      headers: opts.body ? { "Content-Type": "application/json" } : undefined,
-      body: opts.body ? JSON.stringify(opts.body) : undefined,
-    });
-  } catch {
-    throw new Error("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่");
+  for (;;) {
+    const key = store.get("key", "");
+    const headers = { ...(init.headers || {}) };
+    if (key) headers["X-Access-Key"] = key;
+    let res;
+    try {
+      res = await fetch(API_BASE + path, { ...init, headers });
+    } catch {
+      throw new Error("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่");
+    }
+    if (res.status !== 401) return res;
+    const data = await res.clone().json().catch(() => null);
+    if (!data || !data.need_key) return res;
+    const typed = await askAccessKey(key ? "รหัสไม่ถูกต้อง ลองใส่ใหม่อีกครั้ง"
+                                         : "ใส่รหัสที่ได้จากผู้ดูแลระบบ ใส่ครั้งเดียว เครื่องนี้จะจำไว้");
+    if (!typed) throw new Error("ต้องใส่รหัสเข้าใช้งานก่อน จึงจะดูและบันทึกข้อมูลได้");
+    store.set("key", typed);
   }
+}
+
+let keyAsk = null;   // หลายคำขอโดน 401 พร้อมกัน → ถามรหัสครั้งเดียว
+
+function askAccessKey(msg) {
+  if (keyAsk) return keyAsk;
+  keyAsk = new Promise(resolve => {
+    const m = $("#keyModal"), inp = $("#keyInput");
+    $("#keyMsg").textContent = msg;
+    inp.value = "";
+    let done = false;
+    const finish = v => { if (done) return; done = true; keyAsk = null; m._onClose = null; closeModal(m); resolve(v); };
+    $("#keyForm").onsubmit = e => {
+      e.preventDefault();
+      const v = inp.value.trim();
+      if (v) finish(v); else inp.focus();
+    };
+    $("#keyCancel").onclick = () => finish(null);
+    openModal(m);
+    m._onClose = () => finish(null);
+    inp.focus();
+  });
+  return keyAsk;
+}
+
+async function api(path, opts = {}) {
+  const res = await apiFetch(path, {
+    method: opts.method || "GET",
+    headers: opts.body ? { "Content-Type": "application/json" } : undefined,
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
   let data = null;
   try { data = await res.json(); } catch { /* ไม่ใช่ JSON */ }
   if (!res.ok || (data && data.ok === false)) {
@@ -1011,7 +1052,7 @@ async function exportExcel() {
   const btn = $("#btnExcel");
   btn.disabled = true;
   try {
-    const response = await fetch(API_BASE + "/export?" + new URLSearchParams({ date: S.date, q: S.q }));
+    const response = await apiFetch("/export?" + new URLSearchParams({ date: S.date, q: S.q }));
     if (!response.ok) throw new Error("เซิร์ฟเวอร์สร้างไฟล์ไม่สำเร็จ");
     const url = URL.createObjectURL(await response.blob());
     const link = h("a", { href: url, download: `ใบแจ้งงานขนส่ง_${S.date}.xlsx` });

@@ -166,6 +166,20 @@
     </div>
   </div>
 
+  <!-- ===== รหัสเข้าใช้งาน (เฉพาะเปิดผ่านอินเทอร์เน็ต) ===== -->
+  <div class="overlay" id="keyModal" hidden>
+    <form class="modal modal-confirm" id="keyForm" role="dialog" aria-modal="true" aria-labelledby="keyTitle" novalidate>
+      <h2 id="keyTitle">รหัสเข้าใช้งาน</h2>
+      <p id="keyMsg"></p>
+      <input class="f-in key-in" id="keyInput" type="text" autocomplete="off" autocapitalize="characters"
+             spellcheck="false" placeholder="XXXX-XXXX-XXXX" aria-labelledby="keyTitle">
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" id="keyCancel">ยกเลิก</button>
+        <button type="submit" class="btn btn-gold">เข้าใช้งาน</button>
+      </div>
+    </form>
+  </div>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <div class="print-area" id="printArea"></div>
 

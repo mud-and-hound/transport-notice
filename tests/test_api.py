@@ -64,6 +64,27 @@ class TransportTests(unittest.TestCase):
             with self.assertRaises(ValidationError):
                 main.JobIn(**valid, **override)
 
+    def test_tunnel_requests_need_access_key_but_office_does_not(self):
+        tunnel = {'CF-Connecting-IP': '203.0.113.9', 'Origin': 'https://mud-and-hound.github.io'}
+        with patch.object(main, 'ACCESS_KEY', 'K7QM4XPAR2HT'), TestClient(main.app) as client:
+            self.assertEqual(client.get('/api/meta').status_code, 200)              # ในออฟฟิศ
+            denied = client.get('/api/meta', headers=tunnel)
+            self.assertEqual(denied.status_code, 401)
+            self.assertTrue(denied.json()['need_key'])
+            self.assertEqual(denied.headers['access-control-allow-origin'], '*')    # browser อ่าน 401 ได้
+            wrong = client.get('/api/meta', headers={**tunnel, 'X-Access-Key': 'WRONG'})
+            self.assertEqual(wrong.status_code, 401)
+            ok = client.get('/api/meta', headers={**tunnel, 'X-Access-Key': 'k7qm-4xpa r2ht'})
+            self.assertEqual(ok.status_code, 200)
+            preflight = client.options('/api/jobs', headers={**tunnel,
+                                                             'Access-Control-Request-Method': 'POST',
+                                                             'Access-Control-Request-Headers': 'x-access-key'})
+            self.assertEqual(preflight.status_code, 200)
+            self.assertEqual(client.get('/', headers=tunnel).status_code, 200)      # หน้าเว็บไม่ต้องใช้รหัส
+        with patch.object(main, 'ACCESS_KEY', ''), TestClient(main.app) as client:
+            # ยังไม่ได้ตั้งรหัส → ปิดทาง Tunnel ไว้ทั้งหมด
+            self.assertEqual(client.get('/api/meta', headers={**tunnel, 'X-Access-Key': ''}).status_code, 401)
+
 
 if __name__ == '__main__':
     unittest.main()

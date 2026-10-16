@@ -1,0 +1,12 @@
+[Unit]
+Description=Cloudflared tunnel - transport notice (transport-notice.mobile1234.site -> :8606)
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/cloudflared tunnel --config /home/ubuntu1/.cloudflared/transport-notice.yml run transport_notice
+Restart=always
+RestartSec=5
+User=ubuntu1
+
+[Install]
+WantedBy=multi-user.target

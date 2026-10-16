@@ -9,7 +9,9 @@
 | โฟลเดอร์โปรเจกต์ | `/opt/transport_notice` (แยกจาก `/opt/vehiclelog` แล้ว) |
 | เว็บใช้งานจริง (ในออฟฟิศ) | http://10.8.1.88:8606/ — FastAPI พอร์ต 8606 |
 | GitHub | https://github.com/mud-and-hound/transport-notice (Public) |
-| GitHub Pages | https://mud-and-hound.github.io/transport-notice/ — ดูหน้าจอได้อย่างเดียว ยังไม่เชื่อม API |
+| GitHub Pages | https://mud-and-hound.github.io/transport-notice/ — เรียก API ผ่าน `https://transport-notice.mobile1234.site/api` (ต้องใส่รหัสเข้าใช้งานครั้งแรก) — **รอเปิด Tunnel** |
+| Cloudflare Tunnel | ชื่อ `transport_notice` (`5a73f48c-…`), config `~/.cloudflared/transport-notice.yml` → `localhost:8606` |
+| รหัสเข้าใช้งาน | `ACCESS_KEY` ใน `.env` — ใช้เฉพาะคำขอที่มาทางอินเทอร์เน็ต ในออฟฟิศไม่ต้องใช้ |
 | ฐานข้อมูล | MySQL `timemud` บน 10.8.1.88 (phpMyAdmin พอร์ต 81) |
 | ตารางของโปรเจกต์ | `transport_notice_jobs`, `transport_notice_daily_counter`, `transport_notice_branches` |
 | ไฟล์แนบ | `attach_files_here/All.xlsx`, `attach_files_here/ใบแจ้งงานขนส่ง SST.xlsx` (ไม่ขึ้น GitHub) |
@@ -54,10 +56,24 @@
    - แก้โค้ด (`backend/`, `scripts/`, `sql/`, `tests/`), `.env`, `.env.example`, README ให้ใช้ `timemud` + ชื่อตารางใหม่
    - รีสตาร์ทเว็บพอร์ต 8606 ตรวจ health / รายการงาน / สาขา / ส่งออก Excel ผ่าน และทดสอบกับ MySQL จริง (ตาราง TEMPORARY) ผ่าน
    - Backup ก่อนย้าย: `.runtime/database-backups/20261016-091143-to-timemud/`
+9. **09:15–09:20 (Claude) เตรียมเชื่อม GitHub Pages กับฐานข้อมูล**
+   - ไม่ต้องใช้ token GitHub — เครื่องนี้มีสิทธิ์ Cloudflare (`~/.cloudflared/cert.pem`) อยู่แล้ว ใช้วิธีเดียวกับโปรเจกต์อื่น (`*.mobile1234.site`)
+   - เพิ่ม **รหัสเข้าใช้งาน** (`ACCESS_KEY` ใน `.env`): คำขอที่มาทาง Cloudflare (มี header `CF-Connecting-IP`) ต้องส่ง `X-Access-Key` ถูกต้อง ไม่งั้นได้ 401; ในออฟฟิศ 10.8.1.88:8606 ใช้ได้เหมือนเดิมไม่ต้องใส่รหัส; ถ้า `ACCESS_KEY` ว่าง = ปิดทางอินเทอร์เน็ตทั้งหมด
+   - หน้าเว็บ: เปิดจาก GitHub Pages ครั้งแรกจะเด้งป๊อปอัพ "รหัสเข้าใช้งาน" ใส่ครั้งเดียวเครื่องจำไว้ (พิมพ์ตัวเล็ก/มีเว้นวรรคได้)
+   - `config.js` ตั้ง `API_PUBLIC = https://transport-notice.mobile1234.site/api`
+   - สร้าง Cloudflare Tunnel `transport_notice` + config `~/.cloudflared/transport-notice.yml` + ไฟล์ `deploy/cloudflared-transport-notice.service`
+   - ⚠️ คำสั่ง `route dns` ครั้งแรกไปผูก DNS กับ tunnel `mobile_dashboard` (เพราะ cloudflared อ่าน `~/.cloudflared/config.yml` เป็นค่าเริ่มต้น) ต้องสั่งซ้ำพร้อม `--config` และ `--overwrite-dns` — ระบบสิทธิ์อัตโนมัติไม่ให้ Claude ทำขั้นนี้และขั้นเปิด tunnel
 
 ## ยังค้าง / ต้องทำต่อ
 
+- [ ] **เปิด Tunnel ให้ GitHub Pages ใช้งานได้** — รันเองใน Terminal:
+  ```bash
+  # 1) แก้ DNS ให้ชี้ tunnel ที่ถูกตัว
+  cloudflared tunnel --config ~/.cloudflared/transport-notice.yml route dns --overwrite-dns transport_notice transport-notice.mobile1234.site
+  # 2) เปิด tunnel แบบถาวร (ต้องใช้ sudo)
+  sudo cp /opt/transport_notice/deploy/cloudflared-transport-notice.service /etc/systemd/system/
+  sudo systemctl daemon-reload && sudo systemctl enable --now cloudflared-transport-notice
+  ```
 - [ ] ลบฐานข้อมูลว่าง `transport_notice` ใน phpMyAdmin (ไม่มีตารางแล้ว — สิทธิ์อัตโนมัติไม่อนุญาตให้ Claude ลบเอง)
 - [ ] ติดตั้ง systemd (`deploy/transport-notice.service`) ต้องใช้ sudo — ตอนนี้เว็บรันเป็น process ธรรมดา ถ้าเครื่องรีบูตต้องสั่ง `bash scripts/start.sh` เอง
-- [ ] GitHub Pages ยังบันทึกข้อมูลไม่ได้ (ไม่มี API สาธารณะ) ใช้งานจริงผ่าน http://10.8.1.88:8606/
-- [ ] ระบบยังไม่มี login จึงควรใช้ในเครือข่ายสำนักงานเท่านั้น
+- [ ] ระบบยังไม่มี login รายคน — ทางอินเทอร์เน็ตกันด้วยรหัสเข้าใช้งานร่วมกัน 1 รหัส ถ้ารหัสหลุดให้เปลี่ยน `ACCESS_KEY` ใน `.env` แล้วรีสตาร์ทเว็บ
