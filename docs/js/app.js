@@ -350,8 +350,9 @@ function render() {
 
 function renderDateNav() {
   const btn = $("#dateCurrent");
+  // replaceChildren แปลง null เป็นข้อความ "null" → ใส่ป้าย "วันนี้" เฉพาะเมื่อเป็นวันนี้
   btn.replaceChildren(ico("calendar-day"), h("span", null, fmtDateLong(S.date)),
-    S.date === S.today ? h("span", { class: "is-today" }, "วันนี้") : null);
+    ...(S.date === S.today ? [h("span", { class: "is-today" }, "วันนี้")] : []));
   $("#dateNext").disabled = S.date >= S.today;
   $("#dateToday").hidden = S.date === S.today;
 }

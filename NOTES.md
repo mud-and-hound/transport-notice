@@ -9,8 +9,8 @@
 | โฟลเดอร์โปรเจกต์ | `/opt/transport_notice` (แยกจาก `/opt/vehiclelog` แล้ว) |
 | เว็บใช้งานจริง (ในออฟฟิศ) | http://10.8.1.88:8606/ — FastAPI พอร์ต 8606 |
 | GitHub | https://github.com/mud-and-hound/transport-notice (Public) |
-| GitHub Pages | https://mud-and-hound.github.io/transport-notice/ — เรียก API ผ่าน `https://transport-notice.mobile1234.site/api` (ต้องใส่รหัสเข้าใช้งานครั้งแรก) — **รอเปิด Tunnel** |
-| Cloudflare Tunnel | ชื่อ `transport_notice` (`5a73f48c-…`), config `~/.cloudflared/transport-notice.yml` → `localhost:8606` |
+| GitHub Pages | https://mud-and-hound.github.io/transport-notice/ — ✅ เชื่อมฐานข้อมูลแล้ว ผ่าน `https://transport-notice.mobile1234.site/api` (ใส่รหัสเข้าใช้งานครั้งแรกครั้งเดียว) |
+| Cloudflare Tunnel | ชื่อ `transport_notice` (`5a73f48c-…`), config `~/.cloudflared/transport-notice.yml` → `localhost:8606` — รันอยู่ (log: `.runtime/tunnel.log`) |
 | รหัสเข้าใช้งาน | `ACCESS_KEY` ใน `.env` — ใช้เฉพาะคำขอที่มาทางอินเทอร์เน็ต ในออฟฟิศไม่ต้องใช้ |
 | ฐานข้อมูล | MySQL **`transport_notice`** (ฐานข้อมูลเฉพาะโปรเจกต์) บน 10.8.1.88 (phpMyAdmin พอร์ต 81) |
 | ตารางของโปรเจกต์ | `transport_notice_jobs`, `transport_notice_daily_counter`, `transport_notice_branches` |
@@ -71,17 +71,22 @@
 11. **10:30 ย้ายสำเร็จ** ตารางทั้ง 3 อยู่ใน `transport_notice` แล้ว (1,057 สาขา / ใช้งาน 124, ตัวนับ 1, ใบแจ้งงาน 14) ข้อมูลและโครงสร้างตรงกันทุกแถว `timemud` เหลือเฉพาะตารางของ TimeMud
    - `.env` → `DB_NAME=transport_notice` เว็บรีสตาร์ทแล้ว ตรวจ health / รายการงาน / ส่งออก Excel / รหัสเข้าใช้งาน / ทดสอบ MySQL จริง ผ่าน
    - Backup: `.runtime/database-backups/20261016-103002-to-transport_notice/`
+12. **10:34 (Claude) เปิดทางเชื่อม GitHub Pages ↔ ฐานข้อมูล** ตามที่ผู้ใช้สั่ง
+   - แก้ DNS `transport-notice.mobile1234.site` ให้ชี้ tunnel `transport_notice` (เดิมผูกผิดไป `mobile_dashboard`) และเปิด tunnel (4 connection: bkk07 / sin)
+   - ทดสอบจากอินเทอร์เน็ตจริง: ไม่มีรหัส → 401, preflight จาก github.io ผ่าน, มีรหัส → ได้ข้อมูล (สาขา 124, งาน 15 ต.ค. 11 รายการ)
+   - ทดสอบด้วยเบราว์เซอร์จริง (headless Chromium) บน GitHub Pages: ป๊อปอัพขอรหัส → รหัสผิดถามซ้ำ → รหัสถูก (พิมพ์ตัวเล็กได้) โหลดข้อมูลได้ → รีโหลดไม่ถามซ้ำ, ไม่มี JavaScript error
+   - แก้บั๊กปุ่มวันที่แสดงคำว่า "null" เมื่อดูวันที่ไม่ใช่วันนี้
 
 ## ยังค้าง / ต้องทำต่อ
 
-- [ ] **เปิด Tunnel ให้ GitHub Pages ใช้งานได้** — รันเองใน Terminal:
+- [ ] **ตั้งให้เว็บ + tunnel เปิดเองหลังรีบูต** (ต้องใช้ sudo) — ตอนนี้ทั้งสองรันเป็น process ธรรมดา ถ้าเครื่องรีบูต GitHub Pages จะเชื่อมไม่ได้จนกว่าจะเปิดใหม่:
   ```bash
-  # 1) แก้ DNS ให้ชี้ tunnel ที่ถูกตัว
-  cloudflared tunnel --config ~/.cloudflared/transport-notice.yml route dns --overwrite-dns transport_notice transport-notice.mobile1234.site
-  # 2) เปิด tunnel แบบถาวร (ต้องใช้ sudo)
-  sudo cp /opt/transport_notice/deploy/cloudflared-transport-notice.service /etc/systemd/system/
-  sudo systemctl daemon-reload && sudo systemctl enable --now cloudflared-transport-notice
+  sudo cp /opt/transport_notice/deploy/transport-notice.service /opt/transport_notice/deploy/cloudflared-transport-notice.service /etc/systemd/system/
+  sudo systemctl daemon-reload
+  # หยุด process เดิมก่อน แล้วเปิดผ่าน systemd
+  kill $(cat /opt/transport_notice/.runtime/server.pid); pkill -f transport-notice.yml
+  sudo systemctl enable --now transport-notice cloudflared-transport-notice
   ```
-- [ ] ติดตั้ง systemd (`deploy/transport-notice.service`) ต้องใช้ sudo — ตอนนี้เว็บรันเป็น process ธรรมดา ถ้าเครื่องรีบูตต้องสั่ง `bash scripts/start.sh` เอง
+  ถ้ายังไม่ได้ติดตั้ง แล้วเครื่องรีบูต ให้เปิดเองด้วย `bash scripts/start.sh` และ `cloudflared tunnel --no-autoupdate --config ~/.cloudflared/transport-notice.yml run transport_notice`
 - [ ] ระบบยังไม่มี login รายคน — ทางอินเทอร์เน็ตกันด้วยรหัสเข้าใช้งานร่วมกัน 1 รหัส ถ้ารหัสหลุดให้เปลี่ยน `ACCESS_KEY` ใน `.env` แล้วรีสตาร์ทเว็บ
 - [ ] RAM เครื่อง 10.8.1.88 เกือบเต็ม (15 GB ใช้ 13 GB, ไม่มี swap) จน MySQL ถูก OOM killer หยุด 1 ครั้ง (16 ต.ค. 10:04) — ปิด VS Code server เวอร์ชันเก่าที่ค้าง หรือเพิ่ม swap
