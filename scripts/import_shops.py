@@ -92,13 +92,13 @@ def write_shops(cn, rows, replace_active=False):
         raise ValueError('ไม่มีข้อมูลสาขา หยุดนำเข้า')
     try:
         with cn.cursor() as cur:
-            cur.executemany('INSERT INTO transport_branches (brand, shop_id, code, name, alternate_name) VALUES (%s,%s,%s,%s,%s) '
+            cur.executemany('INSERT INTO transport_notice_branches (brand, shop_id, code, name, alternate_name) VALUES (%s,%s,%s,%s,%s) '
                             'ON DUPLICATE KEY UPDATE code=VALUES(code), name=VALUES(name), '
                             'alternate_name=VALUES(alternate_name), is_active=1', rows)
             if replace_active:
                 placeholders = ','.join(['(%s,%s)'] * len(rows))
                 keys = [value for row in rows for value in row[:2]]
-                cur.execute('UPDATE transport_branches SET is_active=0 '
+                cur.execute('UPDATE transport_notice_branches SET is_active=0 '
                             f'WHERE (brand, shop_id) NOT IN ({placeholders})', keys)
         cn.commit()
     except Exception:

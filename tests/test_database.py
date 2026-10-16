@@ -25,7 +25,7 @@ class DatabaseTests(unittest.TestCase):
             def __getattr__(self, key):
                 return getattr(self.inner, key)
             def execute(self, query, args=None):
-                query = query.replace('transport_jobs', 'test_transport_jobs').replace('transport_daily_counter', 'test_transport_daily_counter')
+                query = query.replace('transport_notice_jobs', 'test_transport_notice_jobs').replace('transport_notice_daily_counter', 'test_transport_notice_daily_counter')
                 return self.inner.execute(query, args)
         class Connection:
             def __getattr__(self, key):
@@ -36,7 +36,7 @@ class DatabaseTests(unittest.TestCase):
                 return Cursor()
         try:
             with cn.cursor() as cur:
-                for table in ['transport_jobs', 'transport_daily_counter']:
+                for table in ['transport_notice_jobs', 'transport_notice_daily_counter']:
                     cur.execute(f'CREATE TEMPORARY TABLE test_{table} LIKE {table}')
             body = main.JobIn(deposit_date='2026-10-15', delivery_date='2026-10-16',
                               to_branch_code='PG', from_name='ทดสอบ', item_detail='test')

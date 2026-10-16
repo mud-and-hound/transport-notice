@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # =============================================================================
-#  db_init.py — สร้างตาราง transport_* ใน transport_notice (รันซ้ำได้)
+#  db_init.py — สร้างตาราง transport_notice_* ใน timemud (รันซ้ำได้)
 #  รัน:  ./venv/bin/python scripts/db_init.py
 # =============================================================================
 import os
@@ -25,9 +25,9 @@ def main():
                 cur.execute(s)
                 print("OK:", s.split("(")[0].strip())
             # อัปเกรดฐานข้อมูลเดิม โดยคงข้อมูลสาขาและประวัติใบแจ้งงานไว้
-            cur.execute("SHOW COLUMNS FROM transport_branches LIKE 'alternate_name'")
+            cur.execute("SHOW COLUMNS FROM transport_notice_branches LIKE 'alternate_name'")
             if not cur.fetchone():
-                cur.execute("ALTER TABLE transport_branches ADD COLUMN "
+                cur.execute("ALTER TABLE transport_notice_branches ADD COLUMN "
                             "alternate_name VARCHAR(255) NOT NULL DEFAULT '' AFTER name")
                 print("OK: added branch alternate_name")
         cn.commit()

@@ -1,12 +1,12 @@
 -- =============================================================================
 --  ใบแจ้งงานขนส่ง (Transport Notice) — schema
---  database: transport_notice (ฐานข้อมูลเฉพาะโปรเจกต์)
---  ทุกตารางขึ้นต้นด้วย transport_ และสร้างในฐานข้อมูลที่กำหนดด้วย DB_NAME
+--  database: timemud (MySQL บน 10.8.1.88) — ใช้ร่วมกับตารางของ TimeMud
+--  ทุกตารางขึ้นต้นด้วย transport_notice_ ตามชื่อโปรเจกต์ เพื่อแยกจากตารางเดิม (audit_logs, users, ...)
 --  รันซ้ำได้ (IF NOT EXISTS)
 -- =============================================================================
 
 -- สาขา (นำเข้าจากไฟล์ All → Sheet All Shop)
-CREATE TABLE IF NOT EXISTS transport_branches (
+CREATE TABLE IF NOT EXISTS transport_notice_branches (
   id          INT          NOT NULL AUTO_INCREMENT,
   brand       VARCHAR(10)  NOT NULL,
   shop_id     VARCHAR(20)  NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS transport_branches (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ตัวนับเลขงานรายวัน: 1 แถวต่อ 1 วัน → เลข Job No. เริ่ม 1 ใหม่ทุกเที่ยงคืน
-CREATE TABLE IF NOT EXISTS transport_daily_counter (
+CREATE TABLE IF NOT EXISTS transport_notice_daily_counter (
   work_date  DATE NOT NULL,
   last_seq   INT  NOT NULL DEFAULT 0,
   PRIMARY KEY (work_date)
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS transport_daily_counter (
 
 -- รายการใบแจ้งงานขนส่ง (1 แถว = 1 แถวในฟอร์ม Excel)
 -- ข้อมูลสาขาเก็บแบบ snapshot (code/name/brand/shop_id) เพื่อไม่ให้ประวัติเปลี่ยนตามเมื่อแก้ชื่อสาขา
-CREATE TABLE IF NOT EXISTS transport_jobs (
+CREATE TABLE IF NOT EXISTS transport_notice_jobs (
   id                BIGINT        NOT NULL AUTO_INCREMENT,
   work_date         DATE          NOT NULL COMMENT 'วันที่บันทึก (เวลาไทย) — ใช้รีเซ็ตเลขงาน',
   seq               INT           NOT NULL COMMENT 'เลขงานของวัน 1..N',

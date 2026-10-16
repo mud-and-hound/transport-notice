@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # =============================================================================
-#  main.py — ใบแจ้งงานขนส่ง (Transport Notice) API — FastAPI + MySQL (transport_notice)
+#  main.py — ใบแจ้งงานขนส่ง (Transport Notice) API — FastAPI + MySQL (timemud)
 #
 #  รันที่ :8606 ภายในสำนักงาน
 #  หน้าเว็บจริงอยู่ที่ index.html ในรากโปรเจกต์ → เปิด http://10.8.1.88:8606 ได้เลย
@@ -44,7 +44,7 @@ JOB_COLUMNS = [
     "from_name", "from_dept", "from_branch_code", "from_branch_name", "from_brand", "from_shop_id",
     "item_detail", "qty", "unit", "remark", "created_at", "updated_at",
 ]
-JOB_SELECT = "SELECT " + ", ".join(JOB_COLUMNS) + " FROM transport_jobs"
+JOB_SELECT = "SELECT " + ", ".join(JOB_COLUMNS) + " FROM transport_notice_jobs"
 
 app = FastAPI(title="Transport Notice API", version="1.1", docs_url="/api/docs",
               redoc_url=None, openapi_url="/api/openapi.json")
@@ -143,7 +143,7 @@ def health():
     cn = get_conn()
     try:
         with cn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) AS n FROM transport_branches WHERE is_active=1")
+            cur.execute("SELECT COUNT(*) AS n FROM transport_notice_branches WHERE is_active=1")
             n = cur.fetchone()["n"]
     finally:
         cn.close()
@@ -162,7 +162,7 @@ def branches():
     cn = get_conn()
     try:
         with cn.cursor() as cur:
-            cur.execute("SELECT brand, shop_id, code, name, alternate_name FROM transport_branches "
+            cur.execute("SELECT brand, shop_id, code, name, alternate_name FROM transport_notice_branches "
                         "WHERE is_active=1 ORDER BY brand, code")
             items = cur.fetchall()
     finally:
@@ -194,7 +194,7 @@ def create_job(body: JobIn):
         with cn.cursor() as cur:
             # จองเลขงานของวันแบบ atomic (แถวตัวนับถูก lock จน commit → ไม่ได้เลขซ้ำแม้กดพร้อมกัน)
             cur.execute(
-                "INSERT INTO transport_daily_counter (work_date, last_seq) VALUES (%s, LAST_INSERT_ID(1)) "
+                "INSERT INTO transport_notice_daily_counter (work_date, last_seq) VALUES (%s, LAST_INSERT_ID(1)) "
                 "ON DUPLICATE KEY UPDATE last_seq = LAST_INSERT_ID(last_seq + 1)",
                 (work_date,),
             )
@@ -204,7 +204,7 @@ def create_job(body: JobIn):
             cols = ["work_date", "seq", "job_no", *WRITE_FIELDS, "created_at", "updated_at"]
             vals = [work_date, seq, job_no(seq), *[data[f] for f in WRITE_FIELDS], now, now]
             cur.execute(
-                f"INSERT INTO transport_jobs ({', '.join(cols)}) VALUES ({', '.join(['%s'] * len(cols))})",
+                f"INSERT INTO transport_notice_jobs ({', '.join(cols)}) VALUES ({', '.join(['%s'] * len(cols))})",
                 vals,
             )
             new_id = cur.lastrowid
@@ -226,7 +226,7 @@ def update_job(job_id: int, body: JobIn):
         with cn.cursor() as cur:
             _get_job(cur, job_id)
             sets = ", ".join(f"{f}=%s" for f in WRITE_FIELDS)
-            cur.execute(f"UPDATE transport_jobs SET {sets}, updated_at=%s WHERE id=%s",
+            cur.execute(f"UPDATE transport_notice_jobs SET {sets}, updated_at=%s WHERE id=%s",
                         [*[data[f] for f in WRITE_FIELDS], now_th(), job_id])
         cn.commit()
         with cn.cursor() as cur:
@@ -241,7 +241,7 @@ def delete_job(job_id: int):
     try:
         with cn.cursor() as cur:
             _get_job(cur, job_id)
-            cur.execute("UPDATE transport_jobs SET deleted_at=%s WHERE id=%s", (now_th(), job_id))
+            cur.execute("UPDATE transport_notice_jobs SET deleted_at=%s WHERE id=%s", (now_th(), job_id))
         cn.commit()
     finally:
         cn.close()

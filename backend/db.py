@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # =============================================================================
-#  db.py — โหลด .env + เปิด connection MySQL (transport_notice)
+#  db.py — โหลด .env + เปิด connection MySQL (timemud)
 #  ค่าใน environment จริง (เช่นจาก systemd) มาก่อนค่าใน .env เสมอ
 # =============================================================================
 import os
@@ -31,9 +31,9 @@ def get_conn():
     return pymysql.connect(
         host=os.environ.get("DB_HOST", "localhost"),
         port=int(os.environ.get("DB_PORT", 3306)),
-        user=os.environ.get("DB_USER", "transport_notice"),
+        user=os.environ.get("DB_USER", "timemud"),
         password=os.environ.get("DB_PASSWORD", ""),
-        database=os.environ.get("DB_NAME", "transport_notice"),
+        database=os.environ.get("DB_NAME", "timemud"),
         charset="utf8mb4",
         cursorclass=pymysql.cursors.DictCursor,
         connect_timeout=5,
