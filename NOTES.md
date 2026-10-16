@@ -9,9 +9,9 @@
 | โฟลเดอร์โปรเจกต์ | `/opt/transport_notice` (แยกจาก `/opt/vehiclelog` แล้ว) |
 | เว็บใช้งานจริง (ในออฟฟิศ) | http://10.8.1.88:8606/ — FastAPI พอร์ต 8606 |
 | GitHub | https://github.com/mud-and-hound/transport-notice (Public) |
-| GitHub Pages | https://mud-and-hound.github.io/transport-notice/ — ✅ เชื่อมฐานข้อมูลแล้ว ผ่าน `https://transport-notice.mobile1234.site/api` (ใส่รหัสเข้าใช้งานครั้งแรกครั้งเดียว) |
+| GitHub Pages | https://mud-and-hound.github.io/transport-notice/ — ✅ เชื่อมฐานข้อมูลแล้ว ผ่าน `https://transport-notice.mobile1234.site/api` — เปิดใช้ได้เลย ไม่ต้องใส่รหัส |
 | Cloudflare Tunnel | ชื่อ `transport_notice` (`5a73f48c-…`), config `~/.cloudflared/transport-notice.yml` → `localhost:8606` — รันอยู่ (log: `.runtime/tunnel.log`) |
-| รหัสเข้าใช้งาน | `ACCESS_KEY` ใน `.env` — ใช้เฉพาะคำขอที่มาทางอินเทอร์เน็ต ในออฟฟิศไม่ต้องใช้ |
+| รหัสเข้าใช้งาน | **ปิดอยู่** (`ACCESS_KEY=` ว่างใน `.env`) — ผู้ใช้ขอให้ใช้ได้เลยไม่ต้องมีรหัส; รหัสเดิมเก็บเป็นคอมเมนต์ใน `.env` เผื่อเปิดกลับ |
 | ฐานข้อมูล | MySQL **`transport_notice`** (ฐานข้อมูลเฉพาะโปรเจกต์) บน 10.8.1.88 (phpMyAdmin พอร์ต 81) |
 | ตารางของโปรเจกต์ | `transport_notice_jobs`, `transport_notice_daily_counter`, `transport_notice_branches` |
 | ไฟล์แนบ | `attach_files_here/All.xlsx`, `attach_files_here/ใบแจ้งงานขนส่ง SST.xlsx` (ไม่ขึ้น GitHub) |
@@ -76,6 +76,9 @@
    - ทดสอบจากอินเทอร์เน็ตจริง: ไม่มีรหัส → 401, preflight จาก github.io ผ่าน, มีรหัส → ได้ข้อมูล (สาขา 124, งาน 15 ต.ค. 11 รายการ)
    - ทดสอบด้วยเบราว์เซอร์จริง (headless Chromium) บน GitHub Pages: ป๊อปอัพขอรหัส → รหัสผิดถามซ้ำ → รหัสถูก (พิมพ์ตัวเล็กได้) โหลดข้อมูลได้ → รีโหลดไม่ถามซ้ำ, ไม่มี JavaScript error
    - แก้บั๊กปุ่มวันที่แสดงคำว่า "null" เมื่อดูวันที่ไม่ใช่วันนี้
+13. **10:41 (Claude) ยกเลิกรหัสเข้าใช้งาน** ตามที่ผู้ใช้ขอ "ใช้ได้เลย"
+   - `ACCESS_KEY` ว่าง = ไม่ต้องใช้รหัส (เดิมว่าง = ปิดทางอินเทอร์เน็ต) โค้ดรหัสยังอยู่ เปิดกลับได้แค่ใส่รหัสใน `.env`
+   - ทดสอบ GitHub Pages ด้วยเบราว์เซอร์จริง ทั้งคอมและมือถือ: ไม่มีป๊อปอัพ ข้อมูลขึ้นทันที (15 ต.ค. 11 รายการ) ไม่มี error
 
 ## ยังค้าง / ต้องทำต่อ
 
@@ -88,5 +91,5 @@
   sudo systemctl enable --now transport-notice cloudflared-transport-notice
   ```
   ถ้ายังไม่ได้ติดตั้ง แล้วเครื่องรีบูต ให้เปิดเองด้วย `bash scripts/start.sh` และ `cloudflared tunnel --no-autoupdate --config ~/.cloudflared/transport-notice.yml run transport_notice`
-- [ ] ระบบยังไม่มี login รายคน — ทางอินเทอร์เน็ตกันด้วยรหัสเข้าใช้งานร่วมกัน 1 รหัส ถ้ารหัสหลุดให้เปลี่ยน `ACCESS_KEY` ใน `.env` แล้วรีสตาร์ทเว็บ
+- [ ] ⚠️ ไม่มี login และไม่มีรหัส — ใครมีลิงก์ GitHub Pages ก็ดู/เพิ่ม/แก้/ลบใบแจ้งงานได้ (การลบเป็นแบบซ่อน `deleted_at` กู้คืนจากฐานข้อมูลได้) ถ้าต้องการจำกัด: ใส่ `ACCESS_KEY` ใน `.env` แล้วรีสตาร์ทเว็บ หน้าเว็บจะถามรหัสเองโดยไม่ต้องแก้โค้ด
 - [ ] RAM เครื่อง 10.8.1.88 เกือบเต็ม (15 GB ใช้ 13 GB, ไม่มี swap) จน MySQL ถูก OOM killer หยุด 1 ครั้ง (16 ต.ค. 10:04) — ปิด VS Code server เวอร์ชันเก่าที่ค้าง หรือเพิ่ม swap

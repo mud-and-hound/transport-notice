@@ -10,7 +10,7 @@
 - บันทึกงาน/ประวัติการแก้ไขและกติกาฐานข้อมูล: [`NOTES.md`](NOTES.md)
 - ได้รับ **All.xlsx** และ **ใบแจ้งงานขนส่ง SST.xlsx** แล้วใน `attach_files_here/`
 - Source: [public repository บน GitHub](https://github.com/mud-and-hound/transport-notice)
-- หน้าเว็บบน [GitHub Pages](https://mud-and-hound.github.io/transport-notice/) เรียก API ผ่าน Cloudflare Tunnel `https://transport-notice.mobile1234.site/api` — ครั้งแรกต้องใส่ **รหัสเข้าใช้งาน** (`ACCESS_KEY` ใน `.env`) ส่วนในออฟฟิศผ่าน URL ด้านบนไม่ต้องใส่รหัส (ขั้นเปิด tunnel ดู [`NOTES.md`](NOTES.md))
+- หน้าเว็บบน [GitHub Pages](https://mud-and-hound.github.io/transport-notice/) เรียก API ผ่าน Cloudflare Tunnel `https://transport-notice.mobile1234.site/api` — เปิดใช้ได้เลย ไม่ต้องใส่รหัส (ถ้าต้องการรหัส ใส่ `ACCESS_KEY` ใน `.env` แล้วรีสตาร์ทเว็บ; รายละเอียดดู [`NOTES.md`](NOTES.md))
 
 ตำแหน่งโปรเจกต์: `/opt/transport_notice` แยกเป็นโฟลเดอร์ของตัวเองใต้ `/opt`
 
@@ -94,4 +94,4 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now transport-notice
 ```
 
-`.env`, token, virtualenv และไฟล์บริษัทที่แนบไม่ขึ้น GitHub การเชื่อม GitHub ใช้ credential helper เฉพาะเครื่องและไฟล์ token ที่ป้องกันสิทธิ์ไว้ใน `.runtime/` ไม่ฝัง token ในหน้าเว็บหรือ source ระบบไม่มี login รายคน: ในออฟฟิศใช้ได้เลย ส่วนทางอินเทอร์เน็ต (Cloudflare Tunnel) ต้องมีรหัสเข้าใช้งาน `ACCESS_KEY` — ถ้าเว้นว่าง ทางอินเทอร์เน็ตจะถูกปิดทั้งหมด
+`.env`, token, virtualenv และไฟล์บริษัทที่แนบไม่ขึ้น GitHub การเชื่อม GitHub ใช้ credential helper เฉพาะเครื่องและไฟล์ token ที่ป้องกันสิทธิ์ไว้ใน `.runtime/` ไม่ฝัง token ในหน้าเว็บหรือ source ระบบไม่มี login รายคน: ในออฟฟิศใช้ได้เลย และทางอินเทอร์เน็ต (GitHub Pages ผ่าน Cloudflare Tunnel) ก็ใช้ได้เลยโดยไม่ต้องใส่รหัส ใครมีลิงก์ก็ดู/เพิ่ม/แก้/ลบได้ — ถ้าต้องการจำกัด ใส่ `ACCESS_KEY` ใน `.env` แล้วรีสตาร์ทเว็บ หน้าเว็บจะถามรหัสเอง

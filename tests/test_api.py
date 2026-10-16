@@ -82,8 +82,9 @@ class TransportTests(unittest.TestCase):
             self.assertEqual(preflight.status_code, 200)
             self.assertEqual(client.get('/', headers=tunnel).status_code, 200)      # หน้าเว็บไม่ต้องใช้รหัส
         with patch.object(main, 'ACCESS_KEY', ''), TestClient(main.app) as client:
-            # ยังไม่ได้ตั้งรหัส → ปิดทาง Tunnel ไว้ทั้งหมด
-            self.assertEqual(client.get('/api/meta', headers={**tunnel, 'X-Access-Key': ''}).status_code, 401)
+            # ไม่ได้ตั้งรหัส → เปิดใช้ได้เลยทั้งจากอินเทอร์เน็ตและในออฟฟิศ (รหัสเก่าที่เครื่องจำไว้ก็ไม่เป็นไร)
+            self.assertEqual(client.get('/api/meta', headers=tunnel).status_code, 200)
+            self.assertEqual(client.get('/api/meta', headers={**tunnel, 'X-Access-Key': 'OLD-KEY'}).status_code, 200)
 
 
 if __name__ == '__main__':

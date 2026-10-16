@@ -6,7 +6,7 @@
 #  รันที่ :8606 ภายในสำนักงาน
 #  หน้าเว็บจริงอยู่ที่ index.html ในรากโปรเจกต์ → เปิด http://10.8.1.88:8606 ได้เลย
 #  GitHub Pages เรียก API ผ่าน Cloudflare Tunnel https://transport-notice.mobile1234.site
-#  คำขอที่มาทาง Tunnel ต้องมีรหัสเข้าใช้งาน (ACCESS_KEY ใน .env); ในออฟฟิศไม่ต้องใช้รหัส
+#  ตอนนี้เปิดใช้ได้เลยไม่ต้องใช้รหัส; ถ้าใส่ ACCESS_KEY ใน .env คำขอที่มาทาง Tunnel จะต้องมีรหัส
 #
 #  รัน:  cd backend && ../venv/bin/uvicorn main:app --host 0.0.0.0 --port 8606
 #        (หรือ systemd — ดู transport-notice-api.service)
@@ -61,14 +61,15 @@ def _norm_key(value):
 ACCESS_KEY = _norm_key(os.environ.get("ACCESS_KEY"))
 
 
-# คำขอผ่าน Cloudflare Tunnel (มี header CF-Connecting-IP) = มาจากอินเทอร์เน็ต → ต้องมีรหัส
+# ACCESS_KEY ว่าง = ไม่ต้องใช้รหัส (ค่าปัจจุบัน) / ใส่รหัส = คำขอผ่าน Cloudflare Tunnel
+# (มี header CF-Connecting-IP = มาจากอินเทอร์เน็ต) ต้องส่ง X-Access-Key ให้ถูก ในออฟฟิศไม่ต้องใช้รหัส
 # ประกาศก่อน CORSMiddleware เพื่อให้ CORS ห่อด้านนอก: preflight ผ่าน และ 401 มี CORS header
 @app.middleware("http")
 async def require_access_key(request: Request, call_next):
-    if (request.url.path.startswith("/api/") and request.method != "OPTIONS"
+    if (ACCESS_KEY and request.url.path.startswith("/api/") and request.method != "OPTIONS"
             and "cf-connecting-ip" in request.headers):
         given = _norm_key(request.headers.get("x-access-key"))
-        if not (ACCESS_KEY and hmac.compare_digest(given.encode(), ACCESS_KEY.encode())):
+        if not hmac.compare_digest(given.encode(), ACCESS_KEY.encode()):
             return JSONResponse(status_code=401, content={
                 "ok": False, "need_key": True,
                 "error": "รหัสเข้าใช้งานไม่ถูกต้อง" if given else "กรุณาใส่รหัสเข้าใช้งาน"})
