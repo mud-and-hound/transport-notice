@@ -278,10 +278,6 @@ def delete_job(job_id: int):
 @app.get("/api/export")
 def export_jobs(date: Optional[datetime.date] = None, q: str = ""):
     """Export real XLSX without loading third-party JavaScript in the browser."""
-    from openpyxl import Workbook
-    from openpyxl.styles import Alignment, Font, PatternFill
-    from openpyxl.utils import get_column_letter
-
     work_date = date or now_th().date()
     rows = list_jobs(work_date)["items"]
     search_fields = ["job_no", "to_name", "to_dept", "to_branch_code", "to_branch_name",
@@ -290,6 +286,17 @@ def export_jobs(date: Optional[datetime.date] = None, q: str = ""):
     tokens = q.lower().split()
     rows = [r for r in rows if all(t in " ".join(str(r.get(f, "")) for f in search_fields).lower()
                                    for t in tokens)]
+    filename = quote(f"ใบแจ้งงานขนส่ง_{work_date}.xlsx")
+    return Response(build_xlsx(rows), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"})
+
+
+def build_xlsx(rows):
+    """ไฟล์ Excel 14 คอลัมน์ตามฟอร์ม SST — ใช้ทั้งปุ่ม Excel บนเว็บและไฟล์แนบอีเมลรายวัน"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
     columns = [("ลำดับ", "seq", 8), ("รหัสงาน Job No.", "job_no", 18),
                ("วันที่ฝาก (ว/ด/ป)", "deposit_date", 20), ("วันที่ส่ง (ว/ด/ป)", "delivery_date", 20),
                ("ถึง ผู้รับ", "to_name", 24), ("แผนก ผู้รับ", "to_dept", 24),
@@ -329,9 +336,7 @@ def export_jobs(date: Optional[datetime.date] = None, q: str = ""):
     ws.print_title_rows = "1:1"
     output = BytesIO()
     wb.save(output)
-    filename = quote(f"ใบแจ้งงานขนส่ง_{work_date}.xlsx")
-    return Response(output.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"})
+    return output.getvalue()
 
 
 # Serve the actual root index without exposing project files or .env.

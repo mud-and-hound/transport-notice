@@ -59,3 +59,17 @@ CREATE TABLE IF NOT EXISTS transport_notice_jobs (
   UNIQUE KEY uniq_day_seq (work_date, seq),
   KEY idx_work_date (work_date, deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- บันทึกการส่งอีเมลสรุปรายวัน: กันส่งซ้ำ และให้รอบ retry (00:10, 00:30) ส่งเฉพาะวันที่ยังไม่สำเร็จ
+CREATE TABLE IF NOT EXISTS transport_notice_mail_log (
+  id          BIGINT        NOT NULL AUTO_INCREMENT,
+  work_date   DATE          NOT NULL COMMENT 'วันที่ของข้อมูลที่ส่ง',
+  mode        VARCHAR(10)   NOT NULL COMMENT 'test / live / manual',
+  recipients  VARCHAR(1000) NOT NULL DEFAULT '',
+  job_count   INT           NOT NULL DEFAULT 0,
+  status      VARCHAR(10)   NOT NULL COMMENT 'sent / failed',
+  error       VARCHAR(1000) NOT NULL DEFAULT '',
+  created_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_day_mode (work_date, mode, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

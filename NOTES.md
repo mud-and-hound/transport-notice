@@ -19,6 +19,7 @@
 | ตาราง | `transport_notice_jobs`, `transport_notice_daily_counter`, `transport_notice_branches` |
 | ทางเชื่อมอินเทอร์เน็ต | Cloudflare Tunnel `transport_notice` → `https://transport-notice.mobile1234.site` → `localhost:8606` |
 | รหัสเข้าใช้งาน | **ปิดอยู่** — ใช้ได้เลยไม่ต้องใส่รหัส |
+| อีเมลสรุปรายวัน | ทุกวัน 00:00 ส่งงานของเมื่อวาน — ตอนนี้ **โหมดทดสอบ** (ส่งหา sothon.c@greyhound.co.th) · ⏳ รอข้อมูลบัญชีผู้ส่ง Microsoft 365 |
 
 ### การเชื่อมต่อ
 
@@ -59,6 +60,7 @@
 | เก็บใน GitHub เชื่อม token ใน VS Code | repo Public, token เก็บใน `.runtime/` (ไม่ขึ้น GitHub) |
 | ฐานข้อมูลชื่อตรงกับโปรเจกต์ แยกจาก timemud | ฐานข้อมูล `transport_notice` |
 | เว็บบน GitHub ใช้งานได้จริง เชื่อมฐานข้อมูล | ผ่าน Cloudflare Tunnel ไม่ต้องใส่รหัส |
+| ส่งอีเมลทุกเที่ยงคืน 00:00 ข้อมูลของวันก่อนหน้า ทดสอบก่อนแล้วค่อยส่งจริง | `scripts/send_daily_mail.py` + cron — ตาราง + Excel แนบ, โหมดทดสอบ/จริง (รอบัญชีผู้ส่ง) |
 
 ---
 
@@ -104,6 +106,13 @@
 - ข้อมูลในฐานข้อมูล: สาขา 1,057 แถว (ใช้งาน 124), งาน 15 ต.ค. 14 รายการ (ลบ 3), งาน 16 ต.ค. 2 รายการ
 - เขียนบันทึกนี้ใหม่เป็นฉบับเต็ม
 - push ขึ้น GitHub ไม่ได้ เพราะ token GitHub ใช้ไม่ได้แล้ว (ดูข้อ 7)
+- **สร้างระบบอีเมลสรุปรายวัน** ตามที่ผู้ใช้สั่ง: ส่งทุกเที่ยงคืน 00:00 ข้อมูลของวันก่อนหน้า (เช่น 20/10 00:00 ส่งงานของ 19/10)
+  - เนื้อหา: ตาราง 14 คอลัมน์ + สรุปจำนวนตามหน่วย + ไฟล์ Excel แนบ (ไฟล์เดียวกับปุ่ม Excel บนเว็บ) วันที่ไม่มีงานก็ส่งแจ้งว่า "ไม่มีรายการ"
+  - โหมดทดสอบก่อน → ส่งหา sothon.c@greyhound.co.th (หัวเรื่องมี [ทดสอบ]) / โหมดจริง → 7 ผู้รับ (เก็บใน `.env` ไม่ขึ้น GitHub เพราะ repo Public)
+  - ตั้ง cron 00:00 + รอบสำรอง 00:10, 00:30 (ส่งซ้ำเฉพาะถ้ายังไม่สำเร็จ) — crontab เดิม 87 บรรทัดไม่ถูกแก้ (backup: `.runtime/crontab.backup-20261019`)
+  - เพิ่มตาราง `transport_notice_mail_log` บันทึกผลการส่งทุกครั้ง
+  - ⚠️ พบว่าเครื่อง 10.8.1.88 **ส่งอีเมลแบบ SMTP ไม่ได้** (ไฟร์วอลล์บล็อกพอร์ต 25/465/587) แต่ HTTPS ออกได้ → ส่งผ่าน Microsoft 365 Graph API (ทั้ง greyhound.co.th และ subsrithai.co.th ใช้ Microsoft 365)
+  - ทดสอบ 25 ชุดผ่าน, ดูตัวอย่างอีเมลแล้ว — ยังส่งจริงไม่ได้จนกว่าจะได้ข้อมูลบัญชีผู้ส่ง
 
 ---
 
@@ -135,6 +144,7 @@
 | `scripts/db_init.py` | สร้าง/อัปเกรดตาราง (รันซ้ำได้) |
 | `scripts/import_shops.py` | นำเข้าสาขาจาก All.xlsx |
 | `scripts/start.sh` | เปิดเว็บพอร์ต 8606 |
+| `scripts/send_daily_mail.py` | อีเมลสรุปรายวัน (cron 00:00) |
 | `deploy/*.service` | ไฟล์ systemd สำหรับเว็บ และ tunnel (ยังไม่ได้ติดตั้ง) |
 | `tests/` | ชุดทดสอบ (Python + JavaScript) |
 | `attach_files_here/` | ไฟล์ Excel ต้นฉบับ — **ไม่ขึ้น GitHub** |
@@ -162,6 +172,10 @@ cloudflared tunnel --no-autoupdate --config ~/.cloudflared/transport-notice.yml 
 # นำเข้าสาขาใหม่จาก All.xlsx (ปิดสาขาที่ไม่มีในไฟล์ใหม่ ไม่ลบประวัติ)
 venv/bin/python scripts/import_shops.py attach_files_here/All.xlsx --replace-active --apply
 
+# อีเมลสรุปรายวัน
+venv/bin/python scripts/send_daily_mail.py --preview --date 2026-10-15        # ดูหน้าตาอีเมล (ไม่ส่ง)
+venv/bin/python scripts/send_daily_mail.py --date 2026-10-15 --to sothon.c@greyhound.co.th   # ส่งทดสอบ
+
 # ทดสอบ
 venv/bin/python -m unittest discover -s tests
 TRANSPORT_DB_TEST=1 venv/bin/python -m unittest discover -s tests    # รวมทดสอบกับ MySQL จริง (ไม่แตะข้อมูลจริง)
@@ -169,7 +183,8 @@ TRANSPORT_DB_TEST=1 venv/bin/python -m unittest discover -s tests    # รวม
 
 - **เปิดรหัสเข้าใช้งานกลับ**: ใน `.env` ลบ `#` หน้าบรรทัดรหัสเดิม ลบบรรทัด `ACCESS_KEY=` ที่ว่าง แล้วรีสตาร์ทเว็บ — หน้าเว็บจะถามรหัสเอง
 - **กู้รายการที่ถูกลบ**: การลบเป็นแบบซ่อน — ใน phpMyAdmin ตาราง `transport_notice_jobs` ตั้งค่า `deleted_at` ของแถวนั้นกลับเป็น `NULL`
-- Log: เว็บ `.runtime/server.log`, tunnel `.runtime/tunnel.log`
+- Log: เว็บ `.runtime/server.log`, tunnel `.runtime/tunnel.log`, อีเมล `.runtime/mail.log` (+ ตาราง `transport_notice_mail_log`)
+- **เปลี่ยนอีเมลเป็นส่งจริง**: ใน `.env` แก้ `MAIL_MODE=test` เป็น `MAIL_MODE=live` (รอบเที่ยงคืนถัดไปจะส่งถึง 7 ผู้รับ)
 
 ### กติกาที่ต้องยึด
 
@@ -182,6 +197,8 @@ TRANSPORT_DB_TEST=1 venv/bin/python -m unittest discover -s tests    # รวม
 
 ## 7. งานค้าง
 
+- [ ] **ข้อมูลบัญชีผู้ส่งอีเมล (Microsoft 365)** — ใส่ใน `.env`: `MAIL_FROM` (เมลแอดมิน) + `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET` จาก IT (App registration สิทธิ์ `Mail.Send` แบบ Application) หรือให้ IT เปิดพอร์ต 587 ไป `smtp.office365.com` แล้วใช้ `MAIL_SENDER=smtp` + รหัสผ่านเมลแอดมิน
+- [ ] ทดสอบส่งหา sothon.c@greyhound.co.th ผ่านแล้ว → เปลี่ยน `MAIL_MODE=live`
 - [ ] **ตั้งให้เว็บ + tunnel เปิดเองหลังรีบูต** (ต้องใช้ sudo) — ตอนนี้ทั้งสองรันเป็น process ธรรมดา ถ้าเครื่องรีบูต หน้า GitHub จะใช้ไม่ได้จนกว่าจะเปิดใหม่:
   ```bash
   sudo cp /opt/transport_notice/deploy/transport-notice.service /opt/transport_notice/deploy/cloudflared-transport-notice.service /etc/systemd/system/

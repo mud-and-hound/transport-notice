@@ -70,6 +70,19 @@ venv/bin/python scripts/import_shops.py attach_files_here/All.xlsx --replace-act
 
 ชีต `Shop` ทั่วไปปรับชื่อหัวคอลัมน์ด้วย `--brand`, `--shop-id`, `--code`, `--name` ได้ ส่วน `All Shop` ใช้ Company จับคู่กับแบรนด์ที่ตรวจสอบแล้ว และหยุดเมื่อพบ Company ใหม่ที่ยังไม่มีการจับคู่
 
+## อีเมลสรุปรายวัน
+
+cron ของ `ubuntu1` รัน `scripts/send_daily_mail.py` ทุกวัน **00:00** ส่งใบแจ้งงานของ **เมื่อวาน** (วันที่บันทึก 00:00–23:59 เวลาไทย) เป็นตาราง HTML + ไฟล์ Excel แนบ (ไฟล์เดียวกับปุ่ม Excel บนเว็บ) รอบ 00:10 / 00:30 ส่งซ้ำเฉพาะวันที่ยังส่งไม่สำเร็จ ผลการส่งเก็บในตาราง `transport_notice_mail_log` และ `.runtime/mail.log`
+
+- `MAIL_MODE=test` ส่งเฉพาะ `MAIL_TEST_TO` (หัวเรื่องมี `[ทดสอบ]`) / `MAIL_MODE=live` ส่ง `MAIL_TO` — ผู้รับจริงเก็บใน `.env` เท่านั้น ไม่ขึ้น GitHub
+- เครื่อง 10.8.1.88 ออก SMTP ไม่ได้ (ไฟร์วอลล์บล็อก 25/465/587) จึงส่งผ่าน Microsoft 365 Graph API (HTTPS) — ต้องมี `MAIL_FROM`, `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET` จาก App registration ที่ได้สิทธิ์ `Mail.Send` (Application) หรือถ้าเปิดพอร์ต 587 แล้ว ใช้ `MAIL_SENDER=smtp` + `SMTP_*`
+
+```bash
+venv/bin/python scripts/send_daily_mail.py --preview --date 2026-10-15     # ไม่ส่ง ดูหน้าตาใน .runtime/mail-preview/
+venv/bin/python scripts/send_daily_mail.py --date 2026-10-15 --to you@example.com   # ส่งทดสอบหาที่อยู่เดียว
+venv/bin/python scripts/send_daily_mail.py --date 2026-10-15 --force       # ส่งซ้ำวันที่เคยส่งแล้ว
+```
+
 ## ทดสอบ
 
 ```bash
