@@ -84,6 +84,10 @@ venv/bin/python scripts/send_daily_mail.py --date 2026-10-15 --to you@example.co
 venv/bin/python scripts/send_daily_mail.py --date 2026-10-15 --force       # ส่งซ้ำวันที่เคยส่งแล้ว
 ```
 
+## แก้หน้าเว็บ
+
+แก้ไฟล์ใน `docs/` แล้วรัน `venv/bin/python scripts/stamp_assets.py` ทุกครั้ง เพื่ออัปเดตเลขเวอร์ชัน `?v=` ใน `index.html` ให้เบราว์เซอร์โหลดไฟล์ใหม่ทันที (ชุดทดสอบจะฟ้องถ้าลืม)
+
 ## ทดสอบ
 
 ```bash

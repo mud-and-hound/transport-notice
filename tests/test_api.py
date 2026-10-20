@@ -17,7 +17,7 @@ class TransportTests(unittest.TestCase):
         with TestClient(main.app) as client:
             home = client.get('/')
             self.assertEqual(home.status_code, 200)
-            self.assertIn('src="docs/js/app.js"', home.text)
+            self.assertIn('src="docs/js/app.js?v=', home.text)
             self.assertEqual(home.content, (Path(main.ROOT) / 'index.html').read_bytes())
             self.assertEqual(client.get('/index.html').content, home.content)
             legacy = client.get('/docs/index.html', follow_redirects=False)
@@ -27,6 +27,13 @@ class TransportTests(unittest.TestCase):
                 self.assertEqual(client.get(asset).status_code, 200, asset)
             for private_path in ['/.env', '/backend/db.py', '/attach_files_here/All.xlsx', '/.runtime/github_token.txt']:
                 self.assertEqual(client.get(private_path).status_code, 404, private_path)
+
+    def test_index_asset_versions_match_current_files(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
+        import stamp_assets
+        html = (Path(main.ROOT) / 'index.html').read_text(encoding='utf-8')
+        self.assertEqual(stamp_assets.stamped(html), html,
+                         'แก้ไฟล์ใน docs/ แล้วต้องรัน: venv/bin/python scripts/stamp_assets.py')
 
     def test_required_fields_rejected_by_api_schema(self):
         with self.assertRaises(ValidationError):

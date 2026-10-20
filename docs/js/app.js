@@ -1173,6 +1173,7 @@ async function init() {
   bindEvents();
   applySize();
   applyView();
+  window.tnReady = true;                   // เริ่มหน้าเว็บสำเร็จ → ปิดตัวเตือน "หน้าเว็บเพิ่งอัปเดต" ใน index.html
   S.date = S.today;
   try {
     const m = await api("/meta");          // ใช้ "วันนี้" ของเซิร์ฟเวอร์ (เวลาไทย) เป็นหลัก

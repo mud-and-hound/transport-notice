@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=Noto+Serif+Thai:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="docs/css/style.css">
+  <link rel="stylesheet" href="docs/css/style.css?v=b65da2ea1b">
 </head>
 <body>
 
@@ -182,8 +182,30 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <div class="print-area" id="printArea"></div>
 
-  <script src="docs/js/config.js"></script>
-  <script src="docs/js/icons.js"></script>
-  <script src="docs/js/app.js"></script>
+  <!-- ถ้าเบราว์เซอร์เอาไฟล์โค้ดเก่าในแคชมาปนกับหน้านี้จนโหลดไม่ขึ้น → ขึ้นปุ่ม "โหลดใหม่" แทนหน้าว่าง -->
+  <script>
+    (function () {
+      function stale() {
+        if (window.tnReady || document.getElementById("staleNotice")) return;
+        var box = document.createElement("div");
+        box.id = "staleNotice";
+        box.setAttribute("role", "alert");
+        box.style.cssText = "position:fixed;left:50%;top:5.5rem;transform:translateX(-50%);z-index:999;display:flex;gap:.9rem;align-items:center;max-width:calc(100% - 2rem);padding:.9rem 1.2rem;border-radius:.9rem;background:#1B2E4F;color:#fff;font-size:1.05rem;box-shadow:0 8px 24px rgba(0,0,0,.25)";
+        box.textContent = "หน้าเว็บเพิ่งอัปเดต";
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = "โหลดใหม่";
+        btn.style.cssText = "border:0;border-radius:999px;padding:.5rem 1.1rem;background:#B08A3E;color:#fff;font:inherit;font-weight:700;cursor:pointer";
+        btn.onclick = function () { location.replace(location.pathname + "?r=" + Date.now()); };
+        box.appendChild(btn);
+        document.body.appendChild(box);
+      }
+      window.addEventListener("error", stale);
+      window.addEventListener("unhandledrejection", stale);
+    })();
+  </script>
+  <script src="docs/js/config.js?v=77426d4c80"></script>
+  <script src="docs/js/icons.js?v=08ef0305a0"></script>
+  <script src="docs/js/app.js?v=aeb51d3c98"></script>
 </body>
 </html>
