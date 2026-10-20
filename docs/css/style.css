@@ -165,10 +165,12 @@ button { cursor: pointer; }
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
-.sheet { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; table-layout: fixed; }
-.c-no { width: 3.6rem; } .c-job { width: 6.8rem; } .c-date { width: 7.6rem; }
-.c-name { width: 10rem; } .c-dept { width: 8rem; } .c-branch { width: 10.5rem; }
-.c-item { width: 14rem; } .c-qty { width: 8.4rem; } .c-unit { width: 6.2rem; } .c-remark { width: 11rem; } .c-act { width: 8.8rem; }
+/* width:0 + fixed = กว้างเท่าผลรวมคอลัมน์พอดี (ชื่อสาขายาวไม่ดันตารางให้กว้างขึ้น) จอกว้างกว่านี้จะขยายเต็มจอเอง
+   รวม ≈ 106rem → จอ 1920px ขนาดตัวอักษรปกติ เห็นครบไม่ต้องเลื่อน; ตัวอักษรใหญ่ เลื่อนได้ แต่ปุ่มขวาสุดตรึงไว้เสมอ */
+.sheet { border-collapse: separate; border-spacing: 0; width: 0; min-width: 100%; table-layout: fixed; }
+.c-no { width: 3.4rem; } .c-job { width: 5.8rem; } .c-date { width: 6.3rem; }
+.c-name { width: 8rem; } .c-dept { width: 6.6rem; } .c-branch { width: 8.8rem; }
+.c-item { width: 10rem; } .c-qty { width: 6.6rem; } .c-unit { width: 5.2rem; } .c-remark { width: 7.4rem; } .c-act { width: 8.2rem; }
 
 .sheet thead { position: sticky; top: 0; z-index: 3; }
 .sheet th {
@@ -197,8 +199,11 @@ button { cursor: pointer; }
 
 .sticky-1, .sticky-2 { position: sticky; z-index: 2; }
 .sticky-1 { left: 0; }
-.sticky-2 { left: 3.6rem; box-shadow: 2px 0 0 var(--line-2); }
+.sticky-2 { left: 3.4rem; box-shadow: 2px 0 0 var(--line-2); }
 .sheet thead .sticky-1, .sheet thead .sticky-2 { z-index: 4; }
+/* คอลัมน์ปุ่ม (บันทึก / ทำซ้ำ / ลบ) ตรึงขวาสุด ไม่ต้องเลื่อนไปหา */
+.th-act, .td-act { position: sticky; right: 0; z-index: 2; box-shadow: -2px 0 0 var(--line-2); }
+.sheet thead .th-act { z-index: 4; }
 
 .td-no { text-align: center; font-weight: 700; color: var(--navy); background: #FBF8F1 !important; }
 .td-job { text-align: center; font-weight: 700; color: var(--navy); background: var(--lav) !important; letter-spacing: .02em; }
@@ -226,27 +231,28 @@ select.cell-in { appearance: none; -webkit-appearance: none; padding-right: 1.8r
 .td-missing .cell-in::placeholder, .td-missing .b-empty { color: #C98E83; }
 
 /* ตัวเพิ่ม-ลดจำนวน  [-] 21 [+] */
-.stepper { display: flex; align-items: center; justify-content: center; gap: .2rem; height: 100%; padding: 0 .25rem; }
+.stepper { display: flex; align-items: center; justify-content: center; gap: .15rem; height: 100%; padding: 0 .15rem; }
 .stepper button {
   display: grid; place-items: center; flex-shrink: 0;
-  width: 2.1rem; height: 2.1rem; border-radius: 50%;
+  width: 1.75rem; height: 1.75rem; border-radius: 50%;
   border: 1.5px solid var(--line-2); background: var(--paper); color: var(--navy);
 }
 .stepper button:hover { border-color: var(--navy); background: var(--navy-soft); }
 .stepper input {
-  width: 3.2rem; min-width: 0; text-align: center; font-weight: 700; font-size: 1.05rem;
+  width: 2.3rem; min-width: 0; text-align: center; font-weight: 700; font-size: 1.05rem;
   border: 0; border-bottom: 2px solid var(--line); background: transparent; padding: .2rem 0;
   -moz-appearance: textfield; appearance: textfield;
 }
 .stepper input:focus { outline: none; border-bottom-color: var(--gold); }
 .stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
-.td-act { padding: 0 .35rem !important; }
-.row-act { display: flex; align-items: center; justify-content: center; gap: .3rem; }
-.row-act .btn-icon { width: 2.3rem; height: 2.3rem; }
+.td-act { padding: 0 .3rem !important; }
+.row-act { display: flex; align-items: center; justify-content: center; gap: .25rem; }
+.row-act .btn-icon { width: 2.1rem; height: 2.1rem; }
+.row-act .btn-sm { padding: .25rem .6rem; gap: .3rem; }
 .row-act .btn-icon .ic { width: 1.05rem; height: 1.05rem; }
 .row-act .btn-icon.del:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
-.status { display: inline-grid; place-items: center; width: 1.6rem; height: 1.6rem; }
+.status { display: inline-grid; place-items: center; width: 1.4rem; height: 1.4rem; }
 .status.ok { color: var(--ok); }
 .status.err { color: var(--danger); cursor: pointer; }
 .status.saving::after {

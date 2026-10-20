@@ -376,7 +376,7 @@ function renderSheet() {
   }
   const rows = visibleJobs();
   rows.forEach(({ row, no }) => body.append(sheetRow(row, no)));
-  S.drafts.forEach((d, i) => body.append(sheetRow(d, S.jobs.length + i + 1)));
+  S.drafts.forEach(d => body.append(sheetRow(d, "–")));   // เลขจริงได้จากเซิร์ฟเวอร์ตอนกดบันทึก
   if (!rows.length && !S.drafts.length) {
     body.append(emptyRow(S.q.trim() ? "ไม่พบรายการที่ค้นหา"
       : S.date === S.today ? "ยังไม่มีรายการของวันนี้ — กด “เพิ่มรายการ” เพื่อเริ่มกรอก" : "ไม่มีรายการในวันที่เลือก", "truck"));
