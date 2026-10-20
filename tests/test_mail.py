@@ -94,6 +94,7 @@ class MailTests(unittest.TestCase):
         self.assertIn('วันจันทร์ที่ 19 ตุลาคม 2026', body)
         self.assertIn('ซอง 21', body)
         self.assertIn('อีเมลทดสอบ', body)
+        self.assertIn('กรุณาอย่าตอบกลับ', body)                        # แจ้งเมลส่งอย่างเดียว
         empty = mail.build_html(datetime.date(2026, 10, 17), [], 'live')
         self.assertIn('ไม่มีรายการใบแจ้งงานขนส่ง', empty)
         self.assertNotIn('<th', empty)

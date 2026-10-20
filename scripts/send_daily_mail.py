@@ -136,11 +136,12 @@ def build_html(work_date, rows, mode):
   <tr><td bgcolor="{NAVY}" style="background:{NAVY};padding:18px 22px;border-bottom:3px solid {GOLD};">
     <div style="font-size:22px;font-weight:bold;color:#FFFFFF;">ใบแจ้งงานขนส่ง SST</div>
     <div style="font-size:13px;letter-spacing:1px;color:#D9B66A;">สรุปประจำวัน · {e(fmt_date(work_date))}</div>
+    <div style="font-size:12px;color:#C9D1E0;margin-top:4px;">อีเมลอัตโนมัติ — กรุณาอย่าตอบกลับ</div>
   </td></tr>
   <tr><td style="padding:18px 22px 14px;font-size:15px;line-height:1.7;">เรียน ทุกท่าน<br>{intro}</td></tr>
   <tr><td style="padding:0 22px 20px;">{table}</td></tr>
   <tr><td style="padding:14px 22px;border-top:1px solid #E4DCCB;font-size:12px;line-height:1.6;color:#7A7468;">
-    อีเมลนี้ส่งอัตโนมัติจากระบบใบแจ้งงานขนส่ง ทุกวันเวลา 00:00 น. (ข้อมูลที่บันทึกระหว่าง 00:00–23:59 น. ของวันก่อนหน้า)<br>
+    <b>อีเมลนี้ส่งอัตโนมัติ (ส่งอย่างเดียว) กรุณาอย่าตอบกลับ</b> — ระบบใบแจ้งงานขนส่งส่งทุกวันเวลา 00:00 น. (ข้อมูลที่บันทึกระหว่าง 00:00–23:59 น. ของวันก่อนหน้า)<br>
     ดูหรือแก้ไขข้อมูล: <a href="{WEB_URL}" style="color:{NAVY};">{WEB_URL}</a>
   </td></tr>
 </table>
