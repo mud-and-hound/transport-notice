@@ -6,12 +6,15 @@
 #  cron 00:00 ทุกวัน → ส่งงานของ "เมื่อวาน" (วันที่บันทึก 00:00–23:59 เวลาไทย)
 #  เช่น รันตอน 20/10/2026 00:00 → ส่งงานของวันที่ 19/10/2026
 #  รอบ 00:10 / 00:30 ส่งซ้ำเฉพาะเมื่อรอบก่อนยังไม่สำเร็จ (ดู transport_notice_mail_log)
+#  รอบ 00:30 (--final) ถ้ายังไม่สำเร็จ → ส่งแจ้งเตือนไป MAIL_ALERT_TO (ทีม IT)
 #
 #  รัน:  venv/bin/python scripts/send_daily_mail.py               # ส่งของเมื่อวาน (cron)
 #        venv/bin/python scripts/send_daily_mail.py --preview     # ไม่ส่ง เขียนไฟล์ไว้ดูใน .runtime/mail-preview/
 #        venv/bin/python scripts/send_daily_mail.py --date 2026-10-15 --to sothon.c@greyhound.co.th
 #
-#  .env: MAIL_MODE = test (ส่งเฉพาะ MAIL_TEST_TO) / live (ส่ง MAIL_TO)
+#        venv/bin/python scripts/send_daily_mail.py --test-alert --to you@example.com   # ดูหน้าตาเมลแจ้งเตือน
+#
+#  .env: MAIL_MODE = test (ส่งเฉพาะ MAIL_TEST_TO) / live (ส่ง MAIL_TO), MAIL_ALERT_TO = ผู้รับแจ้งเตือนเมื่อส่งไม่สำเร็จ
 #        MAIL_FROM = กล่องอีเมลผู้ส่ง, MAIL_SENDER = graph (ค่าเริ่มต้น) / smtp
 #        graph → MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET (Microsoft 365 ผ่าน HTTPS)
 #        smtp  → SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD
@@ -234,21 +237,60 @@ def log_attempt(work_date, mode, to, count, status, error=""):
         print(f"  (บันทึก mail_log ไม่ได้: {exc})", file=sys.stderr)
 
 
-def run(argv=None):
-    p = argparse.ArgumentParser(description="ส่งอีเมลสรุปใบแจ้งงานขนส่งรายวัน")
-    p.add_argument("--date", type=datetime.date.fromisoformat,
-                   help="วันที่ของข้อมูล YYYY-MM-DD (ค่าเริ่มต้น = เมื่อวาน ตามเวลาไทย)")
-    p.add_argument("--to", help="ส่งหาที่อยู่นี้แทน (คั่นด้วย ,) ใช้ทดสอบ — ไม่นับเป็นการส่งประจำวัน")
-    p.add_argument("--preview", action="store_true", help="ไม่ส่ง เขียน HTML + Excel ไว้ดูใน .runtime/mail-preview/")
-    p.add_argument("--force", action="store_true", help="ส่งซ้ำแม้วันนั้นส่งสำเร็จไปแล้ว")
-    a = p.parse_args(argv)
+# ---------- แจ้งเตือนทีม IT เมื่อส่งไม่สำเร็จ ----------
+def build_alert_html(work_date, error, stamp, test=False):
+    e = html.escape
+    rerun = f"cd /opt/transport_notice && venv/bin/python scripts/send_daily_mail.py --date {work_date}"
+    note = ('<p style="padding:8px 12px;background:#FFF4D6;border:1px solid #E8C96A;border-radius:6px;">'
+            '<b>อีเมลทดสอบ</b> — ระบบส่งอีเมลปกติดี ไม่ต้องทำอะไร</p>') if test else ""
+    return f"""<!DOCTYPE html><html lang="th"><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:20px;background:#F5F1E8;font-family:Tahoma,Arial,sans-serif;color:#2B2B2B;font-size:14px;line-height:1.6;">
+{note}<div style="max-width:720px;background:#FFFFFF;border:1px solid #E4DCCB;border-top:4px solid #B23A2B;padding:18px 22px;">
+<h2 style="margin:0 0 10px;color:#B23A2B;font-size:19px;">ส่งอีเมลสรุปใบแจ้งงานขนส่งไม่สำเร็จ</h2>
+<p style="margin:0 0 6px;">ข้อมูลของวันที่ <b>{e(fmt_date(work_date))}</b> — ลองส่งแล้ว 3 รอบ (00:00, 00:10, 00:30) ยังไม่สำเร็จ ผู้รับยังไม่ได้อีเมลของวันนี้</p>
+<p style="margin:0 0 4px;"><b>ข้อความจากระบบ</b> (รอบสุดท้าย {e(stamp)}):</p>
+<pre style="margin:0 0 12px;padding:10px;background:#F7F4EE;border:1px solid #E4DCCB;white-space:pre-wrap;word-break:break-word;font-size:12px;">{e(error or "-")}</pre>
+<p style="margin:0 0 4px;"><b>แก้แล้วส่งซ้ำ</b> บนเครื่อง 10.8.1.88:</p>
+<pre style="margin:0 0 12px;padding:10px;background:#1B2E4F;color:#FFFFFF;white-space:pre-wrap;font-size:12px;">{e(rerun)}</pre>
+<p style="margin:0 0 4px;"><b>สาเหตุที่พบบ่อย</b></p>
+<ul style="margin:0 0 12px;padding-left:20px;">
+<li>MySQL หยุดทำงาน (เครื่อง RAM เต็ม) — ดู <code>journalctl -u mysql</code></li>
+<li>รหัสลับแอป <code>transport-notice-mail</code> ใน Microsoft Entra หมดอายุ (~20 ต.ค. 2028) — สร้างใหม่แล้วแก้ <code>MS_CLIENT_SECRET</code> ใน <code>.env</code></li>
+<li>เครื่องออกอินเทอร์เน็ตไม่ได้</li>
+</ul>
+<p style="margin:0;color:#7A7468;font-size:12px;">Log: /opt/transport_notice/.runtime/mail.log · ตาราง transport_notice_mail_log · ระบบใบแจ้งงานขนส่ง (ส่งอัตโนมัติ กรุณาอย่าตอบกลับ)</p>
+</div></body></html>"""
 
-    stamp = app.now_th().strftime("%Y-%m-%d %H:%M:%S")
-    work_date = a.date or (app.now_th().date() - datetime.timedelta(days=1))
+
+def send_alert(work_date, error, stamp, to=None, test=False):
+    to = to if to is not None else env_list("MAIL_ALERT_TO")
+    if not to:
+        print(f"{stamp} (ไม่ได้ตั้ง MAIL_ALERT_TO — ไม่ได้ส่งแจ้งเตือน)", file=sys.stderr)
+        return False
+    subject = ("[ทดสอบ] " if test else "") + \
+        f"[แจ้งเตือน] ส่งอีเมลใบแจ้งงานขนส่ง SST ไม่สำเร็จ — ข้อมูลวันที่ {fmt_date(work_date)}"
+    kind = os.environ.get("MAIL_SENDER", "graph").strip().lower()
+    try:
+        SENDERS[kind](os.environ.get("MAIL_FROM", "").strip(), to, subject,
+                      build_alert_html(work_date, error, stamp, test), [])
+    except Exception as exc:  # noqa: BLE001  ช่องทางส่งเมลเสียเอง (เช่น รหัสลับหมดอายุ) → เหลือแค่ log
+        if not test:
+            log_attempt(work_date, "alert", to, 0, "failed", str(exc))
+        print(f"{stamp} ALERT FAILED -> {', '.join(to)}: {exc}", file=sys.stderr)
+        return False
+    if not test:
+        log_attempt(work_date, "alert", to, 0, "sent", error or "")
+    print(f"{stamp} ALERT SENT -> {', '.join(to)}")
+    return True
+
+
+def send_daily(a, stamp, work_date):
+    """ส่งสรุปของวันนั้น → (exit code, ข้อความ error ถ้ามี)"""
     mode = "manual" if a.to else os.environ.get("MAIL_MODE", "test").strip().lower()
     if mode not in ("test", "live", "manual"):
-        print(f"{stamp} MAIL_MODE ต้องเป็น test หรือ live (ตอนนี้: {mode})", file=sys.stderr)
-        return 2
+        msg = f"MAIL_MODE ต้องเป็น test หรือ live (ตอนนี้: {mode})"
+        print(f"{stamp} {msg}", file=sys.stderr)
+        return 2, msg
     to = env_list("MAIL_TO" if mode == "live" else "MAIL_TEST_TO") if not a.to else \
         [x.strip() for x in a.to.split(",") if x.strip()]
 
@@ -265,14 +307,15 @@ def run(argv=None):
         for name, _, data in attachments:
             (PREVIEW_DIR / name).write_bytes(data)
             print(f"  {PREVIEW_DIR / name}")
-        return 0
+        return 0, ""
 
     if not to:
-        print(f"{stamp} ยังไม่ได้ตั้งผู้รับ ({'MAIL_TO' if mode == 'live' else 'MAIL_TEST_TO'}) ใน .env", file=sys.stderr)
-        return 2
+        msg = f"ยังไม่ได้ตั้งผู้รับ ({'MAIL_TO' if mode == 'live' else 'MAIL_TEST_TO'}) ใน .env"
+        print(f"{stamp} {msg}", file=sys.stderr)
+        return 2, msg
     if mode != "manual" and not a.force and already_sent(work_date, mode):
         print(f"{stamp} SKIP {work_date} {mode}: ส่งสำเร็จไปแล้ว")
-        return 0
+        return 0, ""
 
     kind = os.environ.get("MAIL_SENDER", "graph").strip().lower()
     try:
@@ -282,10 +325,37 @@ def run(argv=None):
     except Exception as exc:  # noqa: BLE001
         log_attempt(work_date, mode, to, len(rows), "failed", str(exc))
         print(f"{stamp} FAILED {work_date} {mode} via {kind}: {exc}", file=sys.stderr)
-        return 1
+        return 1, str(exc)
     log_attempt(work_date, mode, to, len(rows), "sent")
     print(f"{stamp} SENT {work_date} {mode} via {kind}: {len(rows)} รายการ -> {', '.join(to)}")
-    return 0
+    return 0, ""
+
+
+def run(argv=None):
+    p = argparse.ArgumentParser(description="ส่งอีเมลสรุปใบแจ้งงานขนส่งรายวัน")
+    p.add_argument("--date", type=datetime.date.fromisoformat,
+                   help="วันที่ของข้อมูล YYYY-MM-DD (ค่าเริ่มต้น = เมื่อวาน ตามเวลาไทย)")
+    p.add_argument("--to", help="ส่งหาที่อยู่นี้แทน (คั่นด้วย ,) ใช้ทดสอบ — ไม่นับเป็นการส่งประจำวัน")
+    p.add_argument("--preview", action="store_true", help="ไม่ส่ง เขียน HTML + Excel ไว้ดูใน .runtime/mail-preview/")
+    p.add_argument("--force", action="store_true", help="ส่งซ้ำแม้วันนั้นส่งสำเร็จไปแล้ว")
+    p.add_argument("--final", action="store_true", help="รอบสุดท้ายของคืน (00:30): ถ้ายังไม่สำเร็จ ส่งแจ้งเตือนไป MAIL_ALERT_TO")
+    p.add_argument("--test-alert", action="store_true", help="ส่งเมลแจ้งเตือนตัวอย่าง (ไป --to หรือ MAIL_ALERT_TO)")
+    a = p.parse_args(argv)
+
+    stamp = app.now_th().strftime("%Y-%m-%d %H:%M:%S")
+    work_date = a.date or (app.now_th().date() - datetime.timedelta(days=1))
+    if a.test_alert:
+        to = [x.strip() for x in a.to.split(",") if x.strip()] if a.to else None
+        ok = send_alert(work_date, "ตัวอย่างข้อความจากระบบ (ทดสอบ)", stamp, to=to, test=True)
+        return 0 if ok else 1
+    try:
+        code, error = send_daily(a, stamp, work_date)
+    except Exception as exc:  # noqa: BLE001  เช่น MySQL ล่ม อ่านรายการไม่ได้
+        code, error = 1, f"{type(exc).__name__}: {exc}"
+        print(f"{stamp} FAILED {work_date}: {error}", file=sys.stderr)
+    if code and a.final:
+        send_alert(work_date, error, stamp)
+    return code
 
 
 if __name__ == "__main__":

@@ -19,7 +19,7 @@
 | ตาราง | `transport_notice_jobs`, `transport_notice_daily_counter`, `transport_notice_branches` (สาขา/สถานที่ 127), `transport_notice_mail_log` |
 | ทางเชื่อมอินเทอร์เน็ต | Cloudflare Tunnel `transport_notice` → `https://transport-notice.mobile1234.site` → `localhost:8606` |
 | รหัสเข้าใช้งาน | **ปิดอยู่** — ใช้ได้เลยไม่ต้องใส่รหัส |
-| อีเมลสรุปรายวัน | ✅ ทุกวัน 00:00 ส่งงานของเมื่อวาน จาก **it_service@greyhound.co.th** ผ่าน Microsoft 365 (แอป Entra `transport-notice-mail`, สิทธิ์ Mail.Send) — ตอนนี้ **โหมดทดสอบ** ส่งหา sothon.c@greyhound.co.th |
+| อีเมลสรุปรายวัน | ✅ ทุกวัน 00:00 ส่งงานของเมื่อวาน จาก **it_service@greyhound.co.th** ผ่าน Microsoft 365 (แอป Entra `transport-notice-mail`, สิทธิ์ Mail.Send) — ✅ **ส่งจริง** (ตั้งแต่คืน 20→21 ต.ค.) ถึง 8 ผู้รับ · ส่งไม่สำเร็จ → แจ้งเตือน itteam@mudandhound.co.th, ITCafe@greyhound.co.th |
 
 ### การเชื่อมต่อ
 
@@ -61,7 +61,7 @@
 | ฐานข้อมูลชื่อตรงกับโปรเจกต์ แยกจาก timemud | ฐานข้อมูล `transport_notice` |
 | เว็บบน GitHub ใช้งานได้จริง เชื่อมฐานข้อมูล | ผ่าน Cloudflare Tunnel ไม่ต้องใส่รหัส |
 | ปุ่มรูปรถ: เพิ่ม/แสดง/ซ่อนสาขา, ตั้งแท็กหมวด, แก้หน่วย | หน้าตั้งค่า (ไม่มี PIN) — แท็กหลายอันต่อสาขาเป็นปุ่มหมวดตอนเลือกสาขา |
-| ส่งอีเมลทุกเที่ยงคืน 00:00 ข้อมูลของวันก่อนหน้า ทดสอบก่อนแล้วค่อยส่งจริง | `scripts/send_daily_mail.py` + cron — ตาราง + Excel แนบ, โหมดทดสอบ/จริง (รอบัญชีผู้ส่ง) |
+| ส่งอีเมลทุกเที่ยงคืน 00:00 ข้อมูลของวันก่อนหน้า ทดสอบก่อนแล้วค่อยส่งจริง | `scripts/send_daily_mail.py` + cron — ตาราง + Excel แนบ, ส่งจริง 8 ผู้รับ, ไม่สำเร็จแจ้งเตือน IT |
 
 ---
 
@@ -150,6 +150,11 @@
   - ทดสอบ: ชุดทดสอบกับ MySQL จริงด้วยตาราง TEMPORARY + เบราว์เซอร์จริงทั้งคอม/มือถือ (ดักคำสั่งบันทึก ไม่แตะข้อมูลจริง); แก้บั๊กคำว่า "null" โผล่ในหน้าตั้งค่ามือถือ
   - GitHub Actions ล้มครั้งแรก: `/api/meta` อ่านหน่วยจาก MySQL แต่เครื่องทดสอบของ GitHub ไม่มี MySQL → แก้ให้ `/api/meta` ใช้หน่วยเริ่มต้นเมื่อฐานข้อมูลล่ม (หน้าเว็บเปิดได้แม้ MySQL หยุด) + ทดสอบกรณีไม่มีฐานข้อมูล
 
+- 17:55 ✅ **เปิดส่งอีเมลจริง** ตามที่ผู้ใช้ยืนยัน (`MAIL_MODE=live`) — ผู้รับ 8 คน: sst.log@subsrithai.co.th, chongyod.c, walailak.c, thanawan.n, witsanu.p, thanakorn.t, WarehouseandLogisticsCafe (@greyhound.co.th) + **sothon.c@greyhound.co.th** (pornchet.k / wittaya.p ได้เฉพาะรอบลอง 14:30)
+  - **แจ้งเตือน IT** เมื่อส่งไม่สำเร็จ: รอบ 00:30 (`--final`) ถ้ายังไม่สำเร็จ (ส่งไม่ออก, MySQL ล่ม ฯลฯ) → อีเมลแจ้งเตือนไป itteam@mudandhound.co.th, ITCafe@greyhound.co.th พร้อม error + คำสั่งส่งซ้ำ; รอบ 00:00/00:10 ที่พลาดแต่รอบถัดไปสำเร็จจะไม่เตือน — ส่งตัวอย่างแจ้งเตือนให้ sothon.c ดูแล้ว
+  - crontab: `0,10 0 * * *` ส่งปกติ, `30 0 * * * … --final` รอบสุดท้าย (backup: `.runtime/crontab.backup-20261020`)
+  - ผู้ใช้ลบรายการทดสอบของ 20 ต.ค. ออกหมดแล้ว (12 รายการ ลบผ่านเว็บ ล่าสุด 17:10) — เมลคืนนี้จะเป็น "ไม่มีรายการ" ถ้าไม่มีการลงข้อมูลเพิ่มก่อนเที่ยงคืน
+
 ---
 
 ## 4. ปัญหาที่เจอ และบทเรียน
@@ -224,7 +229,7 @@ TRANSPORT_DB_TEST=1 venv/bin/python -m unittest discover -s tests    # รวม
 - **เปิดรหัสเข้าใช้งานกลับ**: ใน `.env` ลบ `#` หน้าบรรทัดรหัสเดิม ลบบรรทัด `ACCESS_KEY=` ที่ว่าง แล้วรีสตาร์ทเว็บ — หน้าเว็บจะถามรหัสเอง
 - **กู้รายการที่ถูกลบ**: การลบเป็นแบบซ่อน — ใน phpMyAdmin ตาราง `transport_notice_jobs` ตั้งค่า `deleted_at` ของแถวนั้นกลับเป็น `NULL`
 - Log: เว็บ `.runtime/server.log`, tunnel `.runtime/tunnel.log`, อีเมล `.runtime/mail.log` (+ ตาราง `transport_notice_mail_log`)
-- **เปลี่ยนอีเมลเป็นส่งจริง**: ใน `.env` แก้ `MAIL_MODE=test` เป็น `MAIL_MODE=live` (รอบเที่ยงคืนถัดไปจะส่งถึง 7 ผู้รับ)
+- **อีเมลรายวัน**: ผู้รับอยู่ที่ `MAIL_TO`, ผู้รับแจ้งเตือนอยู่ที่ `MAIL_ALERT_TO` ใน `.env` (แก้แล้วมีผลรอบเที่ยงคืนถัดไป) · กลับไปโหมดทดสอบ: `MAIL_MODE=test` · ส่งซ้ำวันใด: `venv/bin/python scripts/send_daily_mail.py --date YYYY-MM-DD --force`
 
 ### กติกาที่ต้องยึด
 
@@ -237,7 +242,6 @@ TRANSPORT_DB_TEST=1 venv/bin/python -m unittest discover -s tests    # รวม
 
 ## 7. งานค้าง
 
-- [ ] **เปลี่ยนเป็นส่งจริง** เมื่อตรวจอีเมลทดสอบแล้วโอเค: ใน `.env` แก้ `MAIL_MODE=test` → `MAIL_MODE=live` (เที่ยงคืนถัดไปส่งถึง 7 ผู้รับ)
 - [ ] **Client secret หมดอายุประมาณ 20 ต.ค. 2028** (สร้าง 20 ต.ค. 2026 อายุ 24 เดือน) — ก่อนหมดอายุต้องสร้าง secret ใหม่ใน Entra แล้วแก้ `MS_CLIENT_SECRET` ใน `.env` ไม่งั้นอีเมลจะหยุดส่ง (ดูได้จาก `.runtime/mail.log` ว่า FAILED)
 - [ ] (แนะนำ) จำกัดแอป `transport-notice-mail` ให้ส่งได้เฉพาะกล่อง it_service@greyhound.co.th — ตอนนี้สิทธิ์ Mail.Send แบบ Application ส่งในนามเมลไหนในบริษัทก็ได้ (ตั้งผ่าน Exchange Online PowerShell)
 - [ ] **ตั้งให้เว็บ + tunnel เปิดเองหลังรีบูต** (ต้องใช้ sudo) — ตอนนี้ทั้งสองรันเป็น process ธรรมดา ถ้าเครื่องรีบูต หน้า GitHub จะใช้ไม่ได้จนกว่าจะเปิดใหม่:

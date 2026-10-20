@@ -86,6 +86,69 @@ class MailTests(unittest.TestCase):
             self.assertEqual(mail.run(['--date', '2026-10-19']), 1)
         self.assertEqual(log.call_args.args[4], 'failed')
 
+    def run_failing(self, args, list_jobs=None):
+        def boom(*a):
+            raise RuntimeError('HTTP 401: invalid_client <b>')
+        alerts = []
+        with patch.dict(os.environ, {**ENV, 'MAIL_ALERT_TO': 'it1@example.com, it2@example.com'}), \
+             patch.object(mail.app, 'list_jobs', **(list_jobs or {'return_value': {'items': []}})), \
+             patch.object(mail, 'already_sent', return_value=False), \
+             patch.object(mail, 'log_attempt'), \
+             patch.object(mail, 'send_alert', side_effect=lambda *a, **k: alerts.append(a) or True), \
+             patch.dict(mail.SENDERS, {'graph': boom}):
+            code = mail.run(args)
+        return code, alerts
+
+    def test_only_the_final_round_alerts_it_on_failure(self):
+        self.assertEqual(self.run_failing(['--date', '2026-10-19']), (1, []))                 # 00:00 / 00:10
+        code, alerts = self.run_failing(['--date', '2026-10-19', '--final'])                   # 00:30
+        self.assertEqual(code, 1)
+        self.assertEqual(alerts[0][0], datetime.date(2026, 10, 19))
+        self.assertIn('invalid_client', alerts[0][1])
+
+    def test_database_down_is_caught_and_alerted(self):
+        code, alerts = self.run_failing(['--date', '2026-10-19', '--final'],
+                                        list_jobs={'side_effect': OSError('MySQL down')})
+        self.assertEqual(code, 1)
+        self.assertIn('MySQL down', alerts[0][1])
+
+    def test_success_or_skip_on_final_round_does_not_alert(self):
+        alerts = []
+        with patch.dict(os.environ, ENV), \
+             patch.object(mail.app, 'list_jobs', return_value={'items': []}), \
+             patch.object(mail, 'log_attempt'), \
+             patch.object(mail, 'send_alert', side_effect=lambda *a, **k: alerts.append(a)), \
+             patch.dict(mail.SENDERS, {'graph': lambda *a: None}):
+            with patch.object(mail, 'already_sent', return_value=False):
+                self.assertEqual(mail.run(['--date', '2026-10-19', '--final']), 0)
+            with patch.object(mail, 'already_sent', return_value=True):
+                self.assertEqual(mail.run(['--date', '2026-10-19', '--final']), 0)
+        self.assertEqual(alerts, [])
+
+    def test_alert_goes_to_it_recipients_with_escaped_error(self):
+        sent = []
+        with patch.dict(os.environ, {**ENV, 'MAIL_ALERT_TO': 'it1@example.com; it2@example.com'}), \
+             patch.object(mail, 'log_attempt') as log, \
+             patch.dict(mail.SENDERS, {'graph': lambda *a: sent.append(a)}):
+            self.assertTrue(mail.send_alert(datetime.date(2026, 10, 19), 'boom <script>', '2026-10-20 00:30:01'))
+        sender, to, subject, body, attachments = sent[0]
+        self.assertEqual(to, ['it1@example.com', 'it2@example.com'])
+        self.assertIn('[แจ้งเตือน]', subject)
+        self.assertIn('19/10/2026', subject)
+        self.assertIn('boom &lt;script&gt;', body)
+        self.assertIn('--date 2026-10-19', body)                              # คำสั่งส่งซ้ำ
+        self.assertEqual(attachments, [])
+        self.assertEqual(log.call_args.args[1], 'alert')
+
+    def test_alert_channel_failure_does_not_crash(self):
+        def boom(*a):
+            raise RuntimeError('graph down')
+        with patch.dict(os.environ, {**ENV, 'MAIL_ALERT_TO': 'it@example.com'}), \
+             patch.object(mail, 'log_attempt'), patch.dict(mail.SENDERS, {'graph': boom}):
+            self.assertFalse(mail.send_alert(datetime.date(2026, 10, 19), 'x', 'now'))
+        with patch.dict(os.environ, {**ENV, 'MAIL_ALERT_TO': ''}):
+            self.assertFalse(mail.send_alert(datetime.date(2026, 10, 19), 'x', 'now'))
+
     def test_html_escapes_user_text_and_handles_empty_day(self):
         body = mail.build_html(datetime.date(2026, 10, 19), [ROW], 'test')
         self.assertIn('&lt;script&gt;x&lt;/script&gt;', body)
