@@ -1,7 +1,7 @@
 # บันทึกการทำงาน — ใบแจ้งงานขนส่ง SST (transport_notice)
 
 บันทึกงานทั้งหมดของโปรเจกต์ ตั้งแต่เริ่มสร้างจนถึงปัจจุบัน
-อัปเดตล่าสุด: **19 ต.ค. 2026**
+อัปเดตล่าสุด: **20 ต.ค. 2026**
 
 ---
 
@@ -19,7 +19,7 @@
 | ตาราง | `transport_notice_jobs`, `transport_notice_daily_counter`, `transport_notice_branches` |
 | ทางเชื่อมอินเทอร์เน็ต | Cloudflare Tunnel `transport_notice` → `https://transport-notice.mobile1234.site` → `localhost:8606` |
 | รหัสเข้าใช้งาน | **ปิดอยู่** — ใช้ได้เลยไม่ต้องใส่รหัส |
-| อีเมลสรุปรายวัน | ทุกวัน 00:00 ส่งงานของเมื่อวาน — ตอนนี้ **โหมดทดสอบ** (ส่งหา sothon.c@greyhound.co.th) · ⏳ รอข้อมูลบัญชีผู้ส่ง Microsoft 365 |
+| อีเมลสรุปรายวัน | ✅ ทุกวัน 00:00 ส่งงานของเมื่อวาน จาก **it_service@greyhound.co.th** ผ่าน Microsoft 365 (แอป Entra `transport-notice-mail`, สิทธิ์ Mail.Send) — ตอนนี้ **โหมดทดสอบ** ส่งหา sothon.c@greyhound.co.th |
 
 ### การเชื่อมต่อ
 
@@ -114,6 +114,16 @@
   - ⚠️ พบว่าเครื่อง 10.8.1.88 **ส่งอีเมลแบบ SMTP ไม่ได้** (ไฟร์วอลล์บล็อกพอร์ต 25/465/587) แต่ HTTPS ออกได้ → ส่งผ่าน Microsoft 365 Graph API (ทั้ง greyhound.co.th และ subsrithai.co.th ใช้ Microsoft 365)
   - ทดสอบ 25 ชุดผ่าน, ดูตัวอย่างอีเมลแล้ว — ยังส่งจริงไม่ได้จนกว่าจะได้ข้อมูลบัญชีผู้ส่ง
 
+
+### 20 ต.ค. 2026 — ตั้งค่าผู้ส่งอีเมล + ส่งทดสอบสำเร็จ
+
+- 00:00 / 00:10 / 00:30 cron ลองส่งงานของ 19 ต.ค. — ไม่สำเร็จเพราะยังไม่มีบัญชีผู้ส่ง (ตามคาด)
+- ผู้ใช้สร้างแอปใน Microsoft Entra: `transport-notice-mail` (Single tenant) + Client secret อายุ 24 เดือน + สิทธิ์ **Mail.Send (Application)** + Grant admin consent
+  - ครั้งแรกวาง Secret ID แทน Value → Microsoft ตอบ `AADSTS7000215` → สร้าง secret ใหม่และใช้ Value
+  - ครั้งแรกยังไม่มีสิทธิ์ Mail.Send → ส่งแล้วได้ `403 ErrorAccessDenied` → เพิ่มสิทธิ์ + consent แล้วผ่าน
+- ผู้ส่ง: `it_service@greyhound.co.th` / อีเมลแบบส่งอย่างเดียว มีข้อความ "อีเมลอัตโนมัติ — กรุณาอย่าตอบกลับ" ที่หัวและท้ายอีเมล
+- 14:04 ✅ **ส่งอีเมลทดสอบสำเร็จ** หา sothon.c@greyhound.co.th: งานของ 19 ต.ค. (0 รายการ — ฉบับ "ไม่มีรายการ") และงานของ 16 ต.ค. (2 รายการ พร้อมไฟล์ Excel แนบ)
+
 ---
 
 ## 4. ปัญหาที่เจอ และบทเรียน
@@ -125,6 +135,8 @@
 | หน้า GitHub ไม่ขึ้นข้อมูล | GitHub Pages เป็นแค่หน้าเว็บ ไม่เห็นเครื่องในออฟฟิศ | ใช้ Cloudflare Tunnel แบบเดียวกับโปรเจกต์อื่น (`*.mobile1234.site`) |
 | คิดว่าต้องใช้ token GitHub เพื่อเชื่อม DB | — | token ไม่เกี่ยวกับการเชื่อม DB และห้ามใส่ token ในหน้าเว็บ Public |
 | DNS ผูกผิด tunnel | `cloudflared` อ่าน `~/.cloudflared/config.yml` (tunnel `mobile_dashboard`) เป็นค่าเริ่มต้น | ต้องสั่ง `route dns` พร้อม `--config ~/.cloudflared/transport-notice.yml` เสมอ |
+| อีเมล: Secret ไม่ถูกต้อง (`AADSTS7000215`) | คัดลอกช่อง Secret ID แทน Value | ต้องใช้ช่อง **Value** (ยาว ~40 ตัว มี `~`) ซึ่งโชว์ครั้งเดียวตอนสร้าง |
+| อีเมล: `403 ErrorAccessDenied` | แอปยังไม่มีสิทธิ์ Mail.Send แบบ Application / ยังไม่ consent | เพิ่ม Mail.Send (Application) + Grant admin consent |
 | MySQL หยุดเอง 16 ต.ค. 10:04 | RAM เครื่องเต็ม (15 GB ใช้ 13 GB, ไม่มี swap) → OOM killer | ยังไม่ได้แก้ต้นเหตุ — ดูข้อ 7 |
 | ปุ่มวันที่ขึ้น "null" | `replaceChildren` แปลง `null` เป็นข้อความ | แก้แล้ว (`6b37f36`) |
 
@@ -197,8 +209,9 @@ TRANSPORT_DB_TEST=1 venv/bin/python -m unittest discover -s tests    # รวม
 
 ## 7. งานค้าง
 
-- [ ] **ข้อมูลบัญชีผู้ส่งอีเมล (Microsoft 365)** — ใส่ใน `.env`: `MAIL_FROM` (เมลแอดมิน) + `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET` จาก IT (App registration สิทธิ์ `Mail.Send` แบบ Application) หรือให้ IT เปิดพอร์ต 587 ไป `smtp.office365.com` แล้วใช้ `MAIL_SENDER=smtp` + รหัสผ่านเมลแอดมิน
-- [ ] ทดสอบส่งหา sothon.c@greyhound.co.th ผ่านแล้ว → เปลี่ยน `MAIL_MODE=live`
+- [ ] **เปลี่ยนเป็นส่งจริง** เมื่อตรวจอีเมลทดสอบแล้วโอเค: ใน `.env` แก้ `MAIL_MODE=test` → `MAIL_MODE=live` (เที่ยงคืนถัดไปส่งถึง 7 ผู้รับ)
+- [ ] **Client secret หมดอายุประมาณ 20 ต.ค. 2028** (สร้าง 20 ต.ค. 2026 อายุ 24 เดือน) — ก่อนหมดอายุต้องสร้าง secret ใหม่ใน Entra แล้วแก้ `MS_CLIENT_SECRET` ใน `.env` ไม่งั้นอีเมลจะหยุดส่ง (ดูได้จาก `.runtime/mail.log` ว่า FAILED)
+- [ ] (แนะนำ) จำกัดแอป `transport-notice-mail` ให้ส่งได้เฉพาะกล่อง it_service@greyhound.co.th — ตอนนี้สิทธิ์ Mail.Send แบบ Application ส่งในนามเมลไหนในบริษัทก็ได้ (ตั้งผ่าน Exchange Online PowerShell)
 - [ ] **ตั้งให้เว็บ + tunnel เปิดเองหลังรีบูต** (ต้องใช้ sudo) — ตอนนี้ทั้งสองรันเป็น process ธรรมดา ถ้าเครื่องรีบูต หน้า GitHub จะใช้ไม่ได้จนกว่าจะเปิดใหม่:
   ```bash
   sudo cp /opt/transport_notice/deploy/transport-notice.service /opt/transport_notice/deploy/cloudflared-transport-notice.service /etc/systemd/system/
