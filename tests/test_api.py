@@ -71,6 +71,12 @@ class TransportTests(unittest.TestCase):
             with self.assertRaises(ValidationError):
                 main.JobIn(**valid, **override)
 
+    def test_meta_works_even_when_database_is_down(self):
+        with TestClient(main.app) as client, patch.object(main, 'get_conn', side_effect=OSError('MySQL down')):
+            response = client.get('/api/meta')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['units'], main.DEFAULT_UNITS)
+
     def test_tags_are_cleaned_and_limited(self):
         self.assertEqual(main.norm_tags([' คลังสินค้า ', 'คลังสินค้า', 'ฝั่ง,ตะวันออก', '', 'สาขา']),
                          'คลังสินค้า,ฝั่ง ตะวันออก,สาขา')

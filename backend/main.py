@@ -172,12 +172,17 @@ def health():
 
 @app.get("/api/meta")
 def meta():
-    cn = get_conn()
+    # หน้าเว็บเรียกตอนเปิด — ถ้า MySQL ล่ม (เช่น OOM 16 ต.ค.) ยังได้ "วันนี้" + หน่วยเริ่มต้น หน้าเว็บไม่พังทั้งหน้า
     try:
-        with cn.cursor() as cur:
-            units = active_units(cur)
-    finally:
-        cn.close()
+        cn = get_conn()
+        try:
+            with cn.cursor() as cur:
+                units = active_units(cur)
+        finally:
+            cn.close()
+    except Exception:
+        log.warning("meta: อ่านหน่วยจากฐานข้อมูลไม่ได้ ใช้หน่วยเริ่มต้นแทน", exc_info=True)
+        units = DEFAULT_UNITS
     return {"ok": True, "today": now_th().date().isoformat(), "units": units,
             "job_prefix": JOB_PREFIX, "job_digits": JOB_DIGITS}
 
