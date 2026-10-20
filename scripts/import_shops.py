@@ -17,6 +17,14 @@ ALIASES = {
     'alternate_name': ['alternate_name', 'Shop Name 2', 'ชื่อสาขา2'],
 }
 COMPANY_BRANDS = {'Greyhound Cafe co.,Ltd.': 'GHC', 'XXXX': 'XXXX'}
+# สถานที่ที่ไม่มีในไฟล์ All.xlsx (ผู้ใช้ขอเพิ่ม 20 ต.ค. 2026) — db_init.py เพิ่มให้ และนำเข้าไฟล์ทุกครั้งก็ใส่ด้วย
+# จึงไม่ถูกซ่อนเมื่อใช้ --replace-active; ชื่อรอง (ไทย) ใช้ค้นหา
+# (brand, shop_id, code, name, alternate_name)
+EXTRA_LOCATIONS = [
+    ('GHC', 'PTK20', 'PTK20', 'Office Pattanakarn 20', 'ออฟฟิศ สำนักงาน พัฒนาการ 20'),
+    ('GHC', 'WH49', 'WH49', 'Warehouse 49', 'คลังสินค้า 49'),
+    ('GHC', 'WH76', 'WH76', 'Warehouse 76', 'คลังสินค้า 76'),
+]
 
 
 def normalize(value):
@@ -87,6 +95,11 @@ def read_shops(path, mapping=None):
         wb.close()
 
 
+def with_extra_locations(rows):
+    keys = {(r[0].casefold(), r[1].casefold()) for r in rows}
+    return list(rows) + [x for x in EXTRA_LOCATIONS if (x[0].casefold(), x[1].casefold()) not in keys]
+
+
 def write_shops(cn, rows, replace_active=False):
     if not rows:
         raise ValueError('ไม่มีข้อมูลสาขา หยุดนำเข้า')
@@ -120,6 +133,8 @@ def main():
     except ValueError as exc:
         parser.error(str(exc))
     print(f'ตรวจสอบผ่าน {len(rows)} สาขา')
+    rows = with_extra_locations(rows)
+    print(f'รวมสถานที่เพิ่มเติม (สำนักงาน/คลังสินค้า) เป็น {len(rows)} รายการ')
     if args.replace_active:
         print('รายการเลือกสาขาจะใช้เฉพาะสาขาจากไฟล์นี้ (ไม่ลบสาขาเดิม)')
     if not args.apply:

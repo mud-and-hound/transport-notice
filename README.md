@@ -30,6 +30,7 @@
 - ค้นหา พิมพ์ A4 แนวนอน และส่งออก `.xlsx` จริง (14 คอลัมน์ ตามรายการที่กรอง)
 - ฐานข้อมูลเฉพาะโปรเจกต์ชื่อ `transport_notice` (แยกจาก `timemud`) มีตาราง `transport_notice_jobs`, `transport_notice_daily_counter`, `transport_notice_branches`
 - รายการเลือกสาขาใช้ **124 รายการ** จาก **All.xlsx → All Shop**; ใช้ Shop Code เป็นเลขอ้างอิงและรักษาศูนย์นำหน้า เช่น `0004`
+- สถานที่ที่ไม่มีใน All.xlsx: **PTK20** Office Pattanakarn 20, **WH49** Warehouse 49, **WH76** Warehouse 76 (`EXTRA_LOCATIONS` ใน `scripts/import_shops.py` — `db_init.py` เพิ่มให้ และนำเข้า All.xlsx ใหม่ก็ไม่หาย) รวมรายการเลือก 127 รายการ
 - เก็บ Shop Name 1 เป็นชื่อหลัก และ Shop name 2 สำหรับค้นหาเพิ่มเติม โดยคงรายการ Closed/Close และรายการชื่อ `-` ตามต้นฉบับ
 - ประวัติใบแจ้งงานเก็บชื่อ/รหัสสาขาตอนบันทึก จึงไม่เปลี่ยนตามการนำเข้ารายชื่อสาขาใหม่
 

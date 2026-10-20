@@ -9,6 +9,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "backend"))
 from db import get_conn  # noqa: E402
+from import_shops import EXTRA_LOCATIONS, write_shops  # noqa: E402
 
 SQL_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sql", "001_schema.sql")
 
@@ -31,6 +32,9 @@ def main():
                             "alternate_name VARCHAR(255) NOT NULL DEFAULT '' AFTER name")
                 print("OK: added branch alternate_name")
         cn.commit()
+        # สถานที่ที่ไม่มีใน All.xlsx (สำนักงาน / คลังสินค้า) — เพิ่มหรืออัปเดตทุกครั้ง (รันซ้ำได้)
+        write_shops(cn, EXTRA_LOCATIONS)
+        print("OK: extra locations", ", ".join(x[2] for x in EXTRA_LOCATIONS))
     finally:
         cn.close()
 
