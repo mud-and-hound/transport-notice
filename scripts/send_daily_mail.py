@@ -60,10 +60,11 @@ def fmt_long(d):
 
 
 def unit_summary(rows):
+    # เรียงตามลำดับที่พบในรายการ (หน่วยแก้ได้ในหน้าตั้งค่า รายการเก่าอาจใช้ชื่อหน่วยเดิม)
     totals = {}
     for r in rows:
         totals[r["unit"]] = totals.get(r["unit"], 0) + int(r["qty"])
-    return " · ".join(f"{u} {totals[u]:,}" for u in app.UNITS if u in totals)
+    return " · ".join(f"{u} {n:,}" for u, n in totals.items())
 
 
 def build_subject(work_date, rows, mode):

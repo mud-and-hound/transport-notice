@@ -6,7 +6,7 @@
    ============================================================================= */
 "use strict";
 
-const UNITS = ["กล่อง", "ซอง", "แพค", "ขวด", "ชิ้น"];
+const DEFAULT_UNITS = ["กล่อง", "ซอง", "แพค", "ขวด", "ชิ้น"];   // ใช้จนกว่าจะโหลดหน่วยจริงจากเซิร์ฟเวอร์ (แก้ในหน้าตั้งค่า)
 const QTY_MAX = 99999;
 const BRANCH_LIMIT = 60;
 const POLL_MS = 45000;
@@ -50,6 +50,7 @@ const S = {
   jobs: [],            // รายการที่บันทึกแล้วของวันนั้น
   drafts: [],          // แถวใหม่ที่ยังไม่บันทึก (เวอร์ชันคอม)
   branches: [],
+  units: DEFAULT_UNITS.slice(),   // หน่วยที่เปิดใช้ (/api/meta)
   q: "",
   loading: false,
   loadedAt: null,
@@ -266,7 +267,8 @@ async function loadBranches() {
 
 function indexBranches() {
   for (const b of S.branches) {
-    b._s = { code: b.code.toLowerCase(), name: b.name.toLowerCase(), alternate: (b.alternate_name || "").toLowerCase(), shop: String(b.shop_id).toLowerCase(), brand: b.brand.toLowerCase() };
+    b.tags = Array.isArray(b.tags) ? b.tags : [];   // ข้อมูลในแคชรุ่นเก่าไม่มีแท็ก
+    b._s = { code: b.code.toLowerCase(), name: b.name.toLowerCase(), alternate: (b.alternate_name || "").toLowerCase(), shop: String(b.shop_id).toLowerCase(), brand: b.brand.toLowerCase(), tags: b.tags.join(" ").toLowerCase() };
   }
 }
 
@@ -290,7 +292,7 @@ function blankRow() {
     deposit_date: S.today, delivery_date: S.today,
     to_name: "", to_dept: "", to_branch_code: "", to_branch_name: "", to_brand: "", to_shop_id: "",
     from_name: "", from_dept: "", from_branch_code: "", from_branch_name: "", from_brand: "", from_shop_id: "",
-    item_detail: "", qty: 1, unit: UNITS[0], remark: "",
+    item_detail: "", qty: 1, unit: S.units[0], remark: "",
   };
   // จำผู้ส่งล่าสุดของเครื่องนี้ไว้ให้ ไม่ต้องพิมพ์ซ้ำทุกแถว
   const sender = store.get("sender", {});
@@ -475,7 +477,7 @@ function tdBranch(r, side, label) {
     btn.title = code ? `${code} ${name || ""}`.trim() : "";
     btn.replaceChildren(...(code
       ? [h("span", { class: "b-code" }, code), name ? h("span", { class: "b-name" }, name) : null]
-      : [ico("shop"), h("span", { class: "b-empty" }, "เลือกสาขา")]));
+      : [ico("shop"), h("span", { class: "b-empty" }, "เลือกสาขา")]).filter(Boolean));
   };
   paint();
   btn.addEventListener("click", () => openBranchPicker(label, r, side, () => { paint(); changed(r); }));
@@ -496,8 +498,9 @@ function stepper(r, onChange, big) {
 }
 
 function unitSelect(r, cls, onChange) {
-  const sel = h("select", { class: cls, "aria-label": "หน่วย" }, UNITS.map(u => h("option", { value: u }, u)));
-  sel.value = UNITS.includes(r.unit) ? r.unit : UNITS[0];
+  const units = S.units.length ? S.units : DEFAULT_UNITS;   // หน่วยที่ถูกซ่อน → เลือกหน่วยแรกแทน (เซิร์ฟเวอร์ไม่รับหน่วยที่ซ่อน)
+  const sel = h("select", { class: cls, "aria-label": "หน่วย" }, units.map(u => h("option", { value: u }, u)));
+  sel.value = units.includes(r.unit) ? r.unit : units[0];
   r.unit = sel.value;
   sel.addEventListener("change", () => { r.unit = sel.value; onChange(); });
   return sel;
@@ -720,7 +723,7 @@ function fBranch(r, side, label, opt = {}) {
     const code = r[f], name = r[side + "_branch_name"];
     btn.replaceChildren(ico("shop"), ...(code
       ? [h("span", { class: "b-code" }, code), name ? h("span", { class: "b-name" }, name) : null]
-      : [h("span", { class: "ph" }, "แตะเพื่อค้นหาสาขา")]));
+      : [h("span", { class: "ph" }, "แตะเพื่อค้นหาสาขา")]).filter(Boolean));
   };
   paint();
   btn.addEventListener("click", () => openBranchPicker(label, r, side, () => { paint(); clearMissing(f); }));
@@ -818,26 +821,34 @@ function confirmDialog(title, msg, okText) {
 }
 
 // ---------- ป๊อปอัพเลือกสาขา ----------
-const BP = { r: null, side: null, done: null, brand: "", items: [], active: -1 };
+const BP = { r: null, side: null, done: null, tag: "", items: [], active: -1 };
 
 function openBranchPicker(label, r, side, done) {
-  Object.assign(BP, { r, side, done, active: -1 });
+  Object.assign(BP, { r, side, done, tag: "", active: -1 });
   $("#branchTitle").textContent = "เลือก" + label;
   const inp = $("#branchSearch");
   inp.value = "";
-  renderBrandChips();
+  renderTagChips();
   renderBranchList();
   openModal("#branchModal");
   inp.focus();
 }
 
-function renderBrandChips() {
-  const brands = [...new Set(S.branches.map(b => b.brand))].sort();
-  $("#branchBrands").replaceChildren(
-    ...["", ...brands].map(b => h("button", {
-      type: "button", class: "chip" + (BP.brand === b ? " on" : ""),
-      onclick: () => { BP.brand = b; renderBrandChips(); renderBranchList(); $("#branchSearch").focus(); },
-    }, b || "ทุกแบรนด์")));
+// ปุ่มแท็ก (ตั้งในหน้าตั้งค่า) — 1 สาขามีได้หลายแท็ก เรียงแท็กที่ใช้มากก่อน
+function branchTags(list) {
+  const count = new Map();
+  for (const b of list) for (const t of b.tags || []) count.set(t, (count.get(t) || 0) + 1);
+  return [...count.keys()].sort((a, b) => count.get(b) - count.get(a) || a.localeCompare(b, "th"));
+}
+
+function renderTagChips() {
+  const tags = branchTags(S.branches);
+  if (BP.tag && !tags.includes(BP.tag)) BP.tag = "";
+  $("#branchTags").replaceChildren(
+    ...["", ...tags].map(t => h("button", {
+      type: "button", class: "chip" + (BP.tag === t ? " on" : ""), "aria-pressed": BP.tag === t ? "true" : "false",
+      onclick: () => { BP.tag = t; renderTagChips(); renderBranchList(); $("#branchSearch").focus(); },
+    }, t ? [ico("tag"), t] : "ทั้งหมด")));
 }
 
 function scoreBranch(b, toks) {
@@ -853,6 +864,7 @@ function scoreBranch(b, toks) {
     else if (s.name.includes(" " + t)) sc = 55;
     else if (s.name.includes(t)) sc = 40;
     else if (s.alternate.includes(t)) sc = 38;
+    else if (s.tags.includes(t)) sc = 36;
     else if (s.code.includes(t)) sc = 35;
     else if (s.shop.includes(t)) sc = 25;
     else if (s.brand === t) sc = 20;
@@ -878,17 +890,17 @@ function renderBranchList() {
   const raw = $("#branchSearch").value.trim();
   const toks = raw.toLowerCase().split(/\s+/).filter(Boolean);
   const list = $("#branchList");
-  const pool = BP.brand ? S.branches.filter(b => b.brand === BP.brand) : S.branches;
+  const pool = BP.tag ? S.branches.filter(b => b.tags.includes(BP.tag)) : S.branches;
   const nodes = [];
   let results;
 
   if (!toks.length) {
-    const rec = recentBranches().filter(b => !BP.brand || b.brand === BP.brand);
+    const rec = recentBranches().filter(b => !BP.tag || b.tags.includes(BP.tag));
     if (rec.length) {
       nodes.push(h("div", { class: "bl-head" }, "ใช้ล่าสุด"));
       rec.forEach(b => nodes.push(branchItem(b, [])));
     }
-    nodes.push(h("div", { class: "bl-head" }, BP.brand ? `สาขาแบรนด์ ${BP.brand}` : "สาขาทั้งหมด"));
+    nodes.push(h("div", { class: "bl-head" }, BP.tag ? `แท็ก ${BP.tag}` : "สาขาทั้งหมด"));
     results = pool;
   } else {
     results = pool.map(b => [scoreBranch(b, toks), b]).filter(x => x[0] > 0)
@@ -914,7 +926,7 @@ function branchItem(b, toks) {
   return h("button", { type: "button", class: "bl-item" + (sel ? " selected" : ""), role: "option", onclick: () => pickBranch(b) },
     h("span", { class: "bl-code" }, hl(b.code, toks)),
     h("span", { class: "bl-name" }, hl(b.name, toks)),
-    h("span", { class: "bl-meta" }, b.brand, h("br"), hl(b.shop_id, toks)));
+    h("span", { class: "bl-meta" }, b.tags.map(t => h("span", { class: "tag" }, t))));
 }
 
 function paintActive() {
@@ -989,6 +1001,198 @@ function pickDate(iso) {
   const done = CAL.done;
   closeModal("#calModal");
   if (done) done(iso);
+}
+
+// =============================================================================
+//  หน้าตั้งค่า (กดไอคอนรถมุมซ้ายบน): เพิ่ม/แก้/ซ่อนสาขา + แท็ก, แก้หน่วยที่ส่ง
+// =============================================================================
+const SET = { tab: "branches", branches: [], units: [], q: "", show: "all", edit: null, busy: false };
+
+async function openSettings() {
+  Object.assign(SET, { edit: null, q: "", show: "all" });
+  renderSettings();
+  openModal("#setModal");
+  try {
+    const [b, u] = await Promise.all([api("/settings/branches"), api("/settings/units")]);
+    SET.branches = b.items;
+    SET.units = u.items;
+  } catch (e) {
+    toast("โหลดข้อมูลตั้งค่าไม่ได้: " + e.message, "err");
+  }
+  renderSettings();
+}
+
+function renderSettings() {
+  document.querySelectorAll("#setTabs button").forEach(b => {
+    b.classList.toggle("on", b.dataset.tab === SET.tab);
+    b.setAttribute("aria-selected", b.dataset.tab === SET.tab ? "true" : "false");
+  });
+  // replaceChildren แปลง null เป็นข้อความ "null" → กรองออกก่อน
+  $("#setBody").replaceChildren(...(SET.tab === "branches" ? setBranchesView() : setUnitsView()).filter(Boolean));
+  if (SET.tab === "branches") paintSetList();
+}
+
+// ---------- แท็บสาขา ----------
+function setBranchesView() {
+  const hidden = SET.branches.filter(b => b.hidden).length;
+  const search = h("input", { type: "search", class: "f-in", value: SET.q, placeholder: "ค้นหารหัส ชื่อ หรือแท็ก", "aria-label": "ค้นหาสาขา" });
+  search.addEventListener("input", () => { SET.q = search.value; paintSetList(); });
+  const filters = [["all", `ทั้งหมด ${SET.branches.length}`], ["shown", `แสดงอยู่ ${SET.branches.length - hidden}`], ["hidden", `ซ่อนอยู่ ${hidden}`]];
+  return [
+    h("p", { class: "set-note" }, "สาขาที่ซ่อนจะไม่อยู่ในรายการเลือกสาขา (ใบแจ้งงานเก่ายังแสดงตามเดิม) · แท็กใช้เป็นปุ่มหมวดตอนเลือกสาขา 1 สาขามีได้หลายแท็ก"),
+    h("div", { class: "set-bar" }, search,
+      h("button", { type: "button", class: "btn btn-gold", onclick: () => { SET.edit = "new"; renderSettings(); } }, ico("plus"), "เพิ่มสาขา")),
+    h("div", { class: "chips set-chips" }, filters.map(([k, label]) => h("button", {
+      type: "button", class: "chip" + (SET.show === k ? " on" : ""), onclick: () => { SET.show = k; renderSettings(); },
+    }, label))),
+    SET.edit === "new" ? branchForm(null) : null,
+    h("div", { class: "set-list", id: "setList" }),
+  ];
+}
+
+function paintSetList() {
+  const box = $("#setList");
+  if (!box) return;
+  const toks = SET.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const rows = SET.branches.filter(b => (SET.show === "all" || (SET.show === "hidden") === b.hidden)
+    && toks.every(t => [b.code, b.name, b.alternate_name, ...b.tags].join(" ").toLowerCase().includes(t)));
+  box.replaceChildren(...(rows.length
+    ? rows.map(b => (SET.edit === b.id ? branchForm(b) : branchRow(b)))
+    : [h("div", { class: "bl-more" }, SET.branches.length ? "ไม่พบสาขา" : "กำลังโหลด…")]));
+}
+
+function branchRow(b) {
+  return h("div", { class: "set-row" + (b.hidden ? " is-hidden" : "") },
+    h("span", { class: "bl-code" }, b.code),
+    h("div", { class: "set-main" },
+      h("div", { class: "set-name" }, b.name, b.hidden ? h("span", { class: "set-flag" }, "ซ่อนอยู่") : null),
+      h("div", { class: "set-tags" }, b.tags.length ? b.tags.map(t => h("span", { class: "tag" }, t)) : h("span", { class: "set-none" }, "ยังไม่มีแท็ก"))),
+    h("div", { class: "set-act" },
+      h("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: () => { SET.edit = b.id; renderSettings(); } }, ico("pencil"), "แก้ไข"),
+      h("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: () => saveBranch(b, { hidden: !b.hidden }) },
+        ico(b.hidden ? "eye" : "eye-off"), b.hidden ? "แสดง" : "ซ่อน")));
+}
+
+function branchForm(b) {
+  const tags = b ? [...b.tags] : [];
+  const code = h("input", { class: "f-in", id: "s_code", value: b ? b.code : "", maxlength: 20, placeholder: "เช่น WH49", disabled: !!b, autocomplete: "off" });
+  const name = h("input", { class: "f-in", id: "s_name", value: b ? b.name : "", maxlength: 255, placeholder: "เช่น Warehouse 49", autocomplete: "off" });
+  const alt = h("input", { class: "f-in", id: "s_alt", value: b ? b.alternate_name : "", maxlength: 255, placeholder: "ชื่อไทย / คำที่ใช้ค้นหา เช่น คลังสินค้า 49", autocomplete: "off" });
+  const newTag = h("input", { class: "f-in", maxlength: 30, placeholder: "พิมพ์แท็กใหม่ เช่น คลังสินค้า", "aria-label": "แท็กใหม่", autocomplete: "off" });
+  const pick = h("div", { class: "tag-pick" });
+  const paint = () => pick.replaceChildren(...[...new Set([...branchTags(SET.branches), ...tags])].map(t => h("button", {
+    type: "button", class: "chip" + (tags.includes(t) ? " on" : ""), "aria-pressed": tags.includes(t) ? "true" : "false",
+    onclick: () => { const i = tags.indexOf(t); if (i >= 0) tags.splice(i, 1); else tags.push(t); paint(); },
+  }, ico("tag"), t)));
+  const addTag = () => {
+    const t = newTag.value.replace(/,/g, " ").trim();
+    if (t && !tags.includes(t)) tags.push(t);
+    newTag.value = "";
+    paint();
+  };
+  newTag.addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); addTag(); } });
+  paint();
+  const save = () => {
+    addTag();                                   // แท็กที่พิมพ์ค้างไว้ก็นับด้วย
+    const body = { name: name.value.trim(), alternate_name: alt.value.trim(), tags };
+    if (!b) {
+      body.code = code.value.trim();
+      if (!/^[0-9A-Za-z._-]{1,20}$/.test(body.code)) { toast("รหัสใช้ได้เฉพาะ A-Z 0-9 . _ - ไม่เกิน 20 ตัว (ไม่มีเว้นวรรค)", "err"); code.focus(); return; }
+    }
+    if (!body.name) { toast("กรุณาใส่ชื่อ", "err"); name.focus(); return; }
+    saveBranch(b, body);
+  };
+  setTimeout(() => (b ? name : code).focus(), 0);
+  return h("div", { class: "set-form" },
+    h("h3", null, b ? `แก้ไข ${b.code}` : "เพิ่มสาขา / สถานที่ใหม่"),
+    h("div", { class: "fgrid" },
+      field("s_code", "รหัส (แสดงในไฟล์ Excel)" + (b ? " — เปลี่ยนไม่ได้" : ""), code, { req: !b }),
+      field("s_name", "ชื่อ", name, { req: true }),
+      field("s_alt", "ชื่อรอง / คำค้นหา", alt, { full: true }),
+      h("div", { class: "field full" }, h("label", null, "แท็ก (กดเลือกได้หลายอัน)"), pick,
+        h("div", { class: "tag-new" }, newTag, h("button", { type: "button", class: "btn btn-ghost", onclick: addTag }, ico("plus"), "เพิ่มแท็ก")))),
+    h("div", { class: "set-form-foot" },
+      h("button", { type: "button", class: "btn btn-ghost", onclick: () => { SET.edit = null; renderSettings(); } }, "ยกเลิก"),
+      h("button", { type: "button", class: "btn btn-gold", onclick: save }, ico("check"), "บันทึก")));
+}
+
+async function saveBranch(b, body) {
+  if (SET.busy) return;
+  SET.busy = true;
+  try {
+    const d = b ? await api("/settings/branches/" + b.id, { method: "PUT", body })
+                : await api("/settings/branches", { method: "POST", body });
+    const i = SET.branches.findIndex(x => x.id === d.item.id);
+    if (i >= 0) SET.branches[i] = d.item; else SET.branches.push(d.item);
+    SET.branches.sort((x, y) => x.code.localeCompare(y.code));
+    SET.edit = null;
+    renderSettings();
+    const c = d.item.code;
+    toast(!b ? `เพิ่ม ${c} แล้ว` : "hidden" in body ? (d.item.hidden ? `ซ่อน ${c} แล้ว` : `แสดง ${c} แล้ว`) : `บันทึก ${c} แล้ว`, "ok");
+    loadBranches();                             // รายการเลือกสาขาอัปเดตทันที
+  } catch (e) {
+    toast("บันทึกไม่สำเร็จ: " + e.message, "err");
+  } finally {
+    SET.busy = false;
+  }
+}
+
+// ---------- แท็บหน่วย ----------
+function setUnitsView() {
+  const inp = h("input", { class: "f-in", maxlength: 10, placeholder: "หน่วยใหม่ เช่น ลัง", "aria-label": "หน่วยใหม่", autocomplete: "off" });
+  const add = () => {
+    const name = inp.value.trim();
+    if (name) unitCall(() => api("/settings/units", { method: "POST", body: { name } }), `เพิ่มหน่วย “${name}” แล้ว`);
+  };
+  inp.addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); add(); } });
+  return [
+    h("p", { class: "set-note" }, "เรียงลำดับตามที่แสดงในช่องเลือกหน่วย · หน่วยที่ซ่อนจะเลือกไม่ได้ แต่ใบแจ้งงานเก่ายังแสดงหน่วยเดิม · เปลี่ยนชื่อไม่กระทบรายการที่บันทึกแล้ว"),
+    h("div", { class: "set-bar" }, inp, h("button", { type: "button", class: "btn btn-gold", onclick: add }, ico("plus"), "เพิ่มหน่วย")),
+    h("div", { class: "set-list" }, SET.units.length ? SET.units.map(unitRow) : h("div", { class: "bl-more" }, "กำลังโหลด…")),
+  ];
+}
+
+function unitRow(u, i) {
+  if (SET.edit === "u" + u.id) {
+    const inp = h("input", { class: "f-in", value: u.name, maxlength: 10, "aria-label": "ชื่อหน่วยใหม่", autocomplete: "off" });
+    const save = () => {
+      const name = inp.value.trim();
+      if (!name || name === u.name) { SET.edit = null; renderSettings(); return; }
+      unitCall(() => api("/settings/units/" + u.id, { method: "PUT", body: { name } }), `เปลี่ยน “${u.name}” เป็น “${name}” แล้ว`);
+    };
+    inp.addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); save(); } });
+    setTimeout(() => inp.focus(), 0);
+    return h("div", { class: "set-row" }, inp,
+      h("div", { class: "set-act" },
+        h("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: () => { SET.edit = null; renderSettings(); } }, "ยกเลิก"),
+        h("button", { type: "button", class: "btn btn-gold btn-sm", onclick: save }, ico("check"), "บันทึก")));
+  }
+  const move = dir => unitCall(() => api(`/settings/units/${u.id}/move`, { method: "POST", body: { dir } }));
+  return h("div", { class: "set-row" + (u.hidden ? " is-hidden" : "") },
+    h("div", { class: "set-main" }, h("div", { class: "set-name unit-name" }, u.name, u.hidden ? h("span", { class: "set-flag" }, "ซ่อนอยู่") : null)),
+    h("div", { class: "set-act" },
+      h("button", { type: "button", class: "btn-icon", title: "เลื่อนขึ้น", "aria-label": `เลื่อน ${u.name} ขึ้น`, disabled: i === 0, onclick: () => move(-1) }, ico("chev-up")),
+      h("button", { type: "button", class: "btn-icon", title: "เลื่อนลง", "aria-label": `เลื่อน ${u.name} ลง`, disabled: i === SET.units.length - 1, onclick: () => move(1) }, ico("chev-down")),
+      h("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: () => { SET.edit = "u" + u.id; renderSettings(); } }, ico("pencil"), "เปลี่ยนชื่อ"),
+      h("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: () => unitCall(() => api("/settings/units/" + u.id, { method: "PUT", body: { hidden: !u.hidden } }), u.hidden ? `แสดง “${u.name}” แล้ว` : `ซ่อน “${u.name}” แล้ว`) },
+        ico(u.hidden ? "eye" : "eye-off"), u.hidden ? "แสดง" : "ซ่อน")));
+}
+
+async function unitCall(request, msg) {
+  if (SET.busy) return;
+  SET.busy = true;
+  try {
+    SET.units = (await request()).items;
+    SET.edit = null;
+    renderSettings();
+    if (msg) toast(msg, "ok");
+    const m = await api("/meta");               // ช่องเลือกหน่วยในหน้าหลักใช้หน่วยใหม่ทันที
+    if (Array.isArray(m.units) && m.units.length) { S.units = m.units; render(); }
+  } catch (e) {
+    toast("บันทึกไม่สำเร็จ: " + e.message, "err");
+  } finally {
+    SET.busy = false;
+  }
 }
 
 // =============================================================================
@@ -1082,7 +1286,7 @@ function tick() {
 //  เริ่มต้น
 // =============================================================================
 function setIcons() {
-  $("#brandMark").replaceChildren(ico("truck"));
+  $("#brandMark").replaceChildren(ico("truck"), h("span", { class: "brand-gear" }, ico("settings")));
   $("#viewDesktop").replaceChildren(ico("monitor"), h("span", { class: "lbl" }, "คอม"));
   $("#viewMobile").replaceChildren(ico("smartphone"), h("span", { class: "lbl" }, "มือถือ"));
   $("#datePrev").replaceChildren(ico("arrow-small-left"));
@@ -1161,6 +1365,13 @@ function bindEvents() {
 
   $("#jobForm").addEventListener("submit", submitForm);
 
+  $("#brandMark").addEventListener("click", openSettings);
+  document.querySelectorAll("#setTabs button").forEach(b => b.addEventListener("click", () => {
+    SET.tab = b.dataset.tab;
+    SET.edit = null;
+    renderSettings();
+  }));
+
   window.addEventListener("beforeunload", e => {
     if (S.drafts.some(hasContent)) { e.preventDefault(); e.returnValue = ""; }
   });
@@ -1179,6 +1390,7 @@ async function init() {
     const m = await api("/meta");          // ใช้ "วันนี้" ของเซิร์ฟเวอร์ (เวลาไทย) เป็นหลัก
     S.today = m.today;
     S.date = m.today;
+    if (Array.isArray(m.units) && m.units.length) S.units = m.units;
   } catch (e) {
     setOnline(false, e.message);
   }

@@ -36,7 +36,8 @@ log = logging.getLogger("transport_notice")
 TZ = ZoneInfo("Asia/Bangkok")
 JOB_PREFIX = "TP-"
 JOB_DIGITS = 4
-UNITS = ["กล่อง", "ซอง", "แพค", "ขวด", "ชิ้น"]
+DEFAULT_UNITS = ["กล่อง", "ซอง", "แพค", "ขวด", "ชิ้น"]   # ใช้เมื่อยังไม่มีตารางหน่วย (หน่วยจริงแก้ในหน้าตั้งค่า)
+MANUAL_BRAND = "GHC"                                        # สาขาที่เพิ่มจากหน้าตั้งค่า
 QTY_MAX = 99_999
 DOCS_DIR = os.path.join(ROOT, "docs")
 INDEX_FILE = os.path.join(ROOT, "index.html")
@@ -143,7 +144,7 @@ class JobIn(BaseModel):
     from_shop_id: str = Field("", max_length=20)
     item_detail: str = Field("", max_length=500)
     qty: int = Field(1, ge=1, le=QTY_MAX)
-    unit: str = "กล่อง"
+    unit: str = Field("กล่อง", min_length=1, max_length=10)   # ตรวจกับหน่วยที่เปิดใช้ตอนบันทึก (create_job)
     remark: str = Field("", max_length=500)
 
     @field_validator("to_branch_code", "from_name", "item_detail")
@@ -152,14 +153,6 @@ class JobIn(BaseModel):
         if not v:
             raise ValueError("กรุณากรอกสาขาปลายทาง ผู้ส่ง และรายละเอียด สิ่งที่ส่ง")
         return v
-
-    @field_validator("unit")
-    @classmethod
-    def _unit_ok(cls, v):
-        if v not in UNITS:
-            raise ValueError("หน่วยต้องเป็น " + "/".join(UNITS))
-        return v
-
 
 WRITE_FIELDS = list(JobIn.model_fields)
 
@@ -179,7 +172,13 @@ def health():
 
 @app.get("/api/meta")
 def meta():
-    return {"ok": True, "today": now_th().date().isoformat(), "units": UNITS,
+    cn = get_conn()
+    try:
+        with cn.cursor() as cur:
+            units = active_units(cur)
+    finally:
+        cn.close()
+    return {"ok": True, "today": now_th().date().isoformat(), "units": units,
             "job_prefix": JOB_PREFIX, "job_digits": JOB_DIGITS}
 
 
@@ -189,12 +188,229 @@ def branches():
     cn = get_conn()
     try:
         with cn.cursor() as cur:
-            cur.execute("SELECT brand, shop_id, code, name, alternate_name FROM transport_notice_branches "
-                        "WHERE is_active=1 ORDER BY brand, code")
-            items = cur.fetchall()
+            cur.execute("SELECT brand, shop_id, code, name, alternate_name, tags FROM transport_notice_branches "
+                        "WHERE is_active=1 AND hidden=0 ORDER BY brand, code")
+            items = [{**r, "tags": split_tags(r["tags"])} for r in cur.fetchall()]
     finally:
         cn.close()
     return {"ok": True, "items": items}
+
+
+# =============================================================================
+#  หน้าตั้งค่า (ปุ่มรูปรถมุมซ้ายบน): เพิ่ม/แก้/ซ่อนสาขา + แท็ก, แก้หน่วยที่ส่ง
+#  ไม่มี PIN — ทุกคนที่เปิดเว็บได้ใช้ได้ (ผู้ใช้เลือก 20 ต.ค. 2026)
+# =============================================================================
+def split_tags(text):
+    return [t for t in (text or "").split(",") if t]
+
+
+def norm_tags(tags):
+    out, seen = [], set()
+    for t in tags or []:
+        t = " ".join(str(t).replace(",", " ").split())
+        if t and t.casefold() not in seen:
+            if len(t) > 30:
+                raise HTTPException(422, f"แท็กยาวเกิน 30 ตัวอักษร: {t}")
+            seen.add(t.casefold())
+            out.append(t)
+    joined = ",".join(out)
+    if len(joined) > 255:
+        raise HTTPException(422, "แท็กรวมกันยาวเกินไป")
+    return joined
+
+
+def active_units(cur):
+    cur.execute("SELECT name FROM transport_notice_units WHERE is_active=1 ORDER BY sort_order, id")
+    return [r["name"] for r in cur.fetchall()] or DEFAULT_UNITS
+
+
+class BranchIn(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    code: str = Field(..., min_length=1, max_length=20, pattern=r"^[0-9A-Za-z._-]+$")
+    name: str = Field(..., min_length=1, max_length=255)
+    alternate_name: str = Field("", max_length=255)
+    tags: list[str] = []
+
+
+class BranchUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    alternate_name: Optional[str] = Field(None, max_length=255)
+    tags: Optional[list[str]] = None
+    hidden: Optional[bool] = None
+
+
+class UnitIn(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    name: str = Field(..., min_length=1, max_length=10)
+
+
+class UnitUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    name: Optional[str] = Field(None, min_length=1, max_length=10)
+    hidden: Optional[bool] = None
+
+
+class UnitMove(BaseModel):
+    dir: int = Field(..., ge=-1, le=1)
+
+
+BRANCH_SETTING_COLS = "id, brand, shop_id, code, name, alternate_name, tags, hidden, is_manual"
+
+
+def _branch_out(row):
+    return {**row, "tags": split_tags(row["tags"]), "hidden": bool(row["hidden"]), "is_manual": bool(row["is_manual"])}
+
+
+@app.get("/api/settings/branches")
+def settings_branches():
+    cn = get_conn()
+    try:
+        with cn.cursor() as cur:
+            cur.execute(f"SELECT {BRANCH_SETTING_COLS} FROM transport_notice_branches WHERE is_active=1 ORDER BY code")
+            return {"ok": True, "items": [_branch_out(r) for r in cur.fetchall()]}
+    finally:
+        cn.close()
+
+
+@app.post("/api/settings/branches")
+def add_branch(body: BranchIn):
+    tags = norm_tags(body.tags)
+    cn = get_conn()
+    try:
+        with cn.cursor() as cur:
+            cur.execute("SELECT id, is_active FROM transport_notice_branches WHERE brand=%s AND shop_id=%s",
+                        (MANUAL_BRAND, body.code))
+            old = cur.fetchone()
+            if old and old["is_active"]:
+                raise HTTPException(409, f"รหัส {body.code} มีอยู่แล้ว — ค้นหาแล้วกดแก้ไขแทน")
+            if old:   # เคยมีแต่ถูกปิดจากการนำเข้า → เปิดใหม่เป็นสาขาที่เพิ่มเอง
+                cur.execute("UPDATE transport_notice_branches SET code=%s, name=%s, alternate_name=%s, tags=%s, "
+                            "is_active=1, hidden=0, is_manual=1 WHERE id=%s",
+                            (body.code, body.name, body.alternate_name, tags, old["id"]))
+                new_id = old["id"]
+            else:
+                cur.execute("INSERT INTO transport_notice_branches (brand, shop_id, code, name, alternate_name, tags, is_manual) "
+                            "VALUES (%s,%s,%s,%s,%s,%s,1)",
+                            (MANUAL_BRAND, body.code, body.code, body.name, body.alternate_name, tags))
+                new_id = cur.lastrowid
+            cn.commit()
+            cur.execute(f"SELECT {BRANCH_SETTING_COLS} FROM transport_notice_branches WHERE id=%s", (new_id,))
+            return {"ok": True, "item": _branch_out(cur.fetchone())}
+    finally:
+        cn.close()
+
+
+@app.put("/api/settings/branches/{branch_id}")
+def update_branch(branch_id: int, body: BranchUpdate):
+    changes = body.model_dump(exclude_none=True)
+    if "tags" in changes:
+        changes["tags"] = norm_tags(changes["tags"])
+    if "hidden" in changes:
+        changes["hidden"] = int(changes["hidden"])
+    if not changes:
+        raise HTTPException(422, "ไม่มีข้อมูลที่จะแก้")
+    cn = get_conn()
+    try:
+        with cn.cursor() as cur:
+            sets = ", ".join(f"{k}=%s" for k in changes)
+            cur.execute(f"UPDATE transport_notice_branches SET {sets} WHERE id=%s AND is_active=1",
+                        [*changes.values(), branch_id])
+            cn.commit()
+            cur.execute(f"SELECT {BRANCH_SETTING_COLS} FROM transport_notice_branches WHERE id=%s AND is_active=1",
+                        (branch_id,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(404, "ไม่พบสาขานี้")
+            return {"ok": True, "item": _branch_out(row)}
+    finally:
+        cn.close()
+
+
+def _units_out(cur):
+    cur.execute("SELECT id, name, sort_order, is_active FROM transport_notice_units ORDER BY sort_order, id")
+    return [{"id": r["id"], "name": r["name"], "hidden": not r["is_active"]} for r in cur.fetchall()]
+
+
+@app.get("/api/settings/units")
+def settings_units():
+    cn = get_conn()
+    try:
+        with cn.cursor() as cur:
+            return {"ok": True, "items": _units_out(cur)}
+    finally:
+        cn.close()
+
+
+@app.post("/api/settings/units")
+def add_unit(body: UnitIn):
+    cn = get_conn()
+    try:
+        with cn.cursor() as cur:
+            cur.execute("SELECT id, is_active FROM transport_notice_units WHERE name=%s", (body.name,))
+            old = cur.fetchone()
+            if old and old["is_active"]:
+                raise HTTPException(409, f"มีหน่วย “{body.name}” อยู่แล้ว")
+            if old:
+                cur.execute("UPDATE transport_notice_units SET is_active=1 WHERE id=%s", (old["id"],))
+            else:
+                cur.execute("SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM transport_notice_units")
+                cur.execute("INSERT INTO transport_notice_units (name, sort_order) VALUES (%s,%s)",
+                            (body.name, cur.fetchone()["n"]))
+            cn.commit()
+            return {"ok": True, "items": _units_out(cur)}
+    finally:
+        cn.close()
+
+
+@app.put("/api/settings/units/{unit_id}")
+def update_unit(unit_id: int, body: UnitUpdate):
+    cn = get_conn()
+    try:
+        with cn.cursor() as cur:
+            cur.execute("SELECT id, is_active FROM transport_notice_units WHERE id=%s", (unit_id,))
+            unit = cur.fetchone()
+            if not unit:
+                raise HTTPException(404, "ไม่พบหน่วยนี้")
+            if body.name is not None:
+                cur.execute("SELECT id FROM transport_notice_units WHERE name=%s AND id<>%s", (body.name, unit_id))
+                if cur.fetchone():
+                    raise HTTPException(409, f"มีหน่วย “{body.name}” อยู่แล้ว")
+                cur.execute("UPDATE transport_notice_units SET name=%s WHERE id=%s", (body.name, unit_id))
+            if body.hidden is not None:
+                if body.hidden and unit["is_active"]:
+                    cur.execute("SELECT COUNT(*) AS n FROM transport_notice_units WHERE is_active=1")
+                    if cur.fetchone()["n"] <= 1:
+                        raise HTTPException(409, "ต้องเหลือหน่วยที่ใช้งานอย่างน้อย 1 หน่วย")
+                cur.execute("UPDATE transport_notice_units SET is_active=%s WHERE id=%s", (int(not body.hidden), unit_id))
+            cn.commit()
+            return {"ok": True, "items": _units_out(cur)}
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cn.close()
+
+
+@app.post("/api/settings/units/{unit_id}/move")
+def move_unit(unit_id: int, body: UnitMove):
+    cn = get_conn()
+    try:
+        with cn.cursor() as cur:
+            cur.execute("SELECT id FROM transport_notice_units ORDER BY sort_order, id")
+            ids = [r["id"] for r in cur.fetchall()]
+            if unit_id not in ids:
+                raise HTTPException(404, "ไม่พบหน่วยนี้")
+            i = ids.index(unit_id)
+            j = i + body.dir
+            if 0 <= j < len(ids):
+                ids[i], ids[j] = ids[j], ids[i]
+                cur.executemany("UPDATE transport_notice_units SET sort_order=%s WHERE id=%s",
+                                [(n, uid) for n, uid in enumerate(ids, 1)])
+                cn.commit()
+            return {"ok": True, "items": _units_out(cur)}
+    finally:
+        cn.close()
 
 
 @app.get("/api/jobs")
@@ -219,6 +435,9 @@ def create_job(body: JobIn):
     cn = get_conn()
     try:
         with cn.cursor() as cur:
+            units = active_units(cur)
+            if data["unit"] not in units:
+                raise HTTPException(422, "หน่วยต้องเป็น " + "/".join(units))
             # จองเลขงานของวันแบบ atomic (แถวตัวนับถูก lock จน commit → ไม่ได้เลขซ้ำแม้กดพร้อมกัน)
             cur.execute(
                 "INSERT INTO transport_notice_daily_counter (work_date, last_seq) VALUES (%s, LAST_INSERT_ID(1)) "

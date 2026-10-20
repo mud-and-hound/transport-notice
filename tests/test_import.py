@@ -12,14 +12,6 @@ import import_shops
 
 
 class ShopImportTests(unittest.TestCase):
-    def test_extra_locations_join_every_import_without_duplicates(self):
-        rows = [('GHC', '0004', '0004', 'PG-Siam Paragon', ''), ('GHC', 'wh49', 'WH49', 'จากไฟล์', '')]
-        merged = import_shops.with_extra_locations(rows)
-        codes = [r[2] for r in merged]
-        self.assertEqual(codes, ['0004', 'WH49', 'PTK20', 'WH76'])          # WH49 มีในไฟล์แล้ว ไม่ซ้ำ
-        self.assertEqual(merged[1][3], 'จากไฟล์')
-        for brand, shop_id, code, name, alt in import_shops.EXTRA_LOCATIONS:
-            self.assertTrue(len(brand) <= 10 and len(shop_id) <= 20 and len(code) <= 30)
 
     def workbook(self, path, rows, sheet='Shop', id_format=None):
         wb = Workbook()
@@ -127,6 +119,7 @@ class ShopImportTests(unittest.TestCase):
         self.assertEqual(cur.executemany.call_args.args[1], rows)
         self.assertIn('alternate_name=VALUES(alternate_name)', cur.executemany.call_args.args[0])
         self.assertIn('NOT IN', cur.execute.call_args.args[0])
+        self.assertIn('is_manual=0', cur.execute.call_args.args[0])          # สาขาที่เพิ่มเองไม่ถูกซ่อน
         self.assertEqual(cur.execute.call_args.args[1], ['GHC', '0004', 'XXXX', 'TEST'])
         cn.commit.assert_called_once_with()
         cn.rollback.assert_not_called()

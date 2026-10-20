@@ -13,11 +13,25 @@ CREATE TABLE IF NOT EXISTS transport_notice_branches (
   code        VARCHAR(30)  NOT NULL,
   name        VARCHAR(255) NOT NULL,
   alternate_name VARCHAR(255) NOT NULL DEFAULT '',
-  is_active   TINYINT(1)   NOT NULL DEFAULT 1,
+  tags        VARCHAR(255) NOT NULL DEFAULT '' COMMENT 'หมวด/แท็ก คั่นด้วย , (ตั้งในหน้าตั้งค่า)',
+  is_active   TINYINT(1)   NOT NULL DEFAULT 1 COMMENT 'มีในไฟล์ All.xlsx ล่าสุด (การนำเข้าเป็นผู้กำหนด)',
+  hidden      TINYINT(1)   NOT NULL DEFAULT 0 COMMENT 'ซ่อนจากรายการเลือก (ตั้งในหน้าตั้งค่า)',
+  is_manual   TINYINT(1)   NOT NULL DEFAULT 0 COMMENT 'เพิ่มจากหน้าตั้งค่า — --replace-active ไม่ซ่อน',
   updated_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uniq_brand_shop (brand, shop_id),
   KEY idx_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- หน่วยที่ส่ง (แก้ในหน้าตั้งค่า) — ใบแจ้งงานเก็บชื่อหน่วยเป็นข้อความ จึงเปลี่ยนชื่อ/ซ่อนได้โดยประวัติไม่เปลี่ยน
+CREATE TABLE IF NOT EXISTS transport_notice_units (
+  id          INT          NOT NULL AUTO_INCREMENT,
+  name        VARCHAR(10)  NOT NULL,
+  sort_order  INT          NOT NULL DEFAULT 0,
+  is_active   TINYINT(1)   NOT NULL DEFAULT 1,
+  updated_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uniq_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ตัวนับเลขงานรายวัน: 1 แถวต่อ 1 วัน → เลข Job No. เริ่ม 1 ใหม่ทุกเที่ยงคืน

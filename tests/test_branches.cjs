@@ -29,4 +29,17 @@ assert.equal(vm.runInContext('blankRow().from_branch_code', context), '');
 assert.equal(vm.runInContext('blankRow().from_name', context), 'ผู้ส่ง');
 vm.runInContext('delete S.branches[0].alternate_name; indexBranches();', context);
 assert.equal(vm.runInContext('scoreBranch(S.branches[0], ["missing"])', context), 0);
-console.log('Branch number/name/alternate-name search and current-master recent selections passed');
+// แท็ก: ค้นด้วยแท็กได้, เรียงแท็กที่ใช้มากก่อน, ข้อมูลแคชเก่าที่ไม่มีแท็กไม่พัง
+vm.runInContext(`
+  S.branches = [
+    { brand: 'GHC', shop_id: 'WH49', code: 'WH49', name: 'Warehouse 49', alternate_name: '', tags: ['คลังสินค้า', 'ฝั่งตะวันออก'] },
+    { brand: 'GHC', shop_id: 'WH76', code: 'WH76', name: 'Warehouse 76', alternate_name: '', tags: ['คลังสินค้า'] },
+    { brand: 'GHC', shop_id: '0004', code: '0004', name: 'PG-Siam Paragon', alternate_name: '' },
+  ];
+  indexBranches();
+`, context);
+assert.ok(vm.runInContext('scoreBranch(S.branches[0], ["ตะวันออก"])', context) > 0, 'tag search');
+assert.equal(vm.runInContext('scoreBranch(S.branches[2], ["คลัง"])', context), 0);
+assert.deepEqual([...vm.runInContext('branchTags(S.branches)', context)], ['คลังสินค้า', 'ฝั่งตะวันออก']);
+assert.deepEqual([...vm.runInContext('S.branches[2].tags', context)], []);
+console.log('Branch number/name/alternate-name/tag search and current-master recent selections passed');

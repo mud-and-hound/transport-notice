@@ -67,9 +67,23 @@ class TransportTests(unittest.TestCase):
         self.assertEqual(main.job_no(10000), 'TP-10000')
         valid = dict(deposit_date=datetime.date.today(), delivery_date=datetime.date.today(),
                      to_branch_code='PG', from_name='ผู้ส่ง', item_detail='เอกสาร')
-        for override in [{'qty': 0}, {'qty': 100000}, {'qty': 1.2}, {'unit': 'ลัง'}]:
+        for override in [{'qty': 0}, {'qty': 100000}, {'qty': 1.2}, {'unit': ''}, {'unit': 'หน่วยยาวเกินสิบตัว'}]:
             with self.assertRaises(ValidationError):
                 main.JobIn(**valid, **override)
+
+    def test_tags_are_cleaned_and_limited(self):
+        self.assertEqual(main.norm_tags([' คลังสินค้า ', 'คลังสินค้า', 'ฝั่ง,ตะวันออก', '', 'สาขา']),
+                         'คลังสินค้า,ฝั่ง ตะวันออก,สาขา')
+        self.assertEqual(main.split_tags('คลังสินค้า,สาขา'), ['คลังสินค้า', 'สาขา'])
+        self.assertEqual(main.split_tags(''), [])
+        with self.assertRaises(main.HTTPException):
+            main.norm_tags(['ก' * 31])
+
+    def test_branch_code_must_be_simple_text(self):
+        self.assertEqual(main.BranchIn(code='WH49', name='Warehouse 49').code, 'WH49')
+        for code in ['WH 49', '', 'คลัง49', 'x' * 21]:
+            with self.assertRaises(ValidationError):
+                main.BranchIn(code=code, name='ทดสอบ')
 
     def test_saved_jobs_cannot_be_edited(self):
         with TestClient(main.app) as client, patch.object(main, 'get_conn') as conn:
