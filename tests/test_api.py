@@ -64,6 +64,14 @@ class TransportTests(unittest.TestCase):
             with self.assertRaises(ValidationError):
                 main.JobIn(**valid, **override)
 
+    def test_saved_jobs_cannot_be_edited(self):
+        with TestClient(main.app) as client, patch.object(main, 'get_conn') as conn:
+            response = client.put('/api/jobs/5', json={'deposit_date': '2026-10-20', 'delivery_date': '2026-10-20',
+                                                       'to_branch_code': 'PG', 'from_name': 'x', 'item_detail': 'y'})
+            self.assertEqual(response.status_code, 403)
+            self.assertIn('คัดลอก', response.json()['detail'])
+            conn.assert_not_called()                                   # ไม่แตะฐานข้อมูลเลย
+
     def test_tunnel_requests_need_access_key_but_office_does_not(self):
         tunnel = {'CF-Connecting-IP': '203.0.113.9', 'Origin': 'https://mud-and-hound.github.io'}
         with patch.object(main, 'ACCESS_KEY', 'K7QM4XPAR2HT'), TestClient(main.app) as client:

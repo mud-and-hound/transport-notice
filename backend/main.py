@@ -245,21 +245,11 @@ def create_job(body: JobIn):
         cn.close()
 
 
+# รายการที่บันทึกแล้วแก้ไขไม่ได้ (ตามที่ผู้ใช้กำหนด 20 ต.ค. 2026) — จะแก้ให้คัดลอกเป็นรายการใหม่แล้วลบรายการเดิม
+# คง route ไว้เพื่อตอบข้อความชัดเจนให้หน้าเว็บเวอร์ชันเก่าที่ยังค้างในเบราว์เซอร์
 @app.put("/api/jobs/{job_id}")
-def update_job(job_id: int, body: JobIn):
-    data = body.model_dump()
-    cn = get_conn()
-    try:
-        with cn.cursor() as cur:
-            _get_job(cur, job_id)
-            sets = ", ".join(f"{f}=%s" for f in WRITE_FIELDS)
-            cur.execute(f"UPDATE transport_notice_jobs SET {sets}, updated_at=%s WHERE id=%s",
-                        [*[data[f] for f in WRITE_FIELDS], now_th(), job_id])
-        cn.commit()
-        with cn.cursor() as cur:
-            return {"ok": True, "item": _get_job(cur, job_id)}
-    finally:
-        cn.close()
+def update_job(job_id: int):
+    raise HTTPException(403, "รายการที่บันทึกแล้วแก้ไขไม่ได้ — กด “คัดลอก” แก้ข้อมูลแล้วบันทึก จากนั้นลบรายการเดิม")
 
 
 @app.delete("/api/jobs/{job_id}")

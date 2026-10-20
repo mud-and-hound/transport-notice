@@ -302,6 +302,7 @@ function blankRow() {
 function copyRow(src) {
   const r = blankRow();
   for (const f of FIELDS) r[f] = src[f];
+  r._from = src.job_no;
   refreshDraftBranch(r, "to");
   refreshDraftBranch(r, "from");
   if (r.deposit_date < S.today) r.deposit_date = S.today;
@@ -391,24 +392,40 @@ function emptyRow(msg, ic) {
     h("div", { style: "position:sticky;left:0;width:min(100%,60rem)" }, ico(ic), msg)));
 }
 
+// แถวใหม่ = กรอกได้ / แถวที่บันทึกแล้ว = อ่านอย่างเดียว (จะแก้ให้กดคัดลอก → แก้ → บันทึก → ลบรายการเดิม)
 function sheetRow(r, no) {
   const draft = !r.id;
   const tr = h("tr", { class: draft ? "is-draft" : null, "data-key": rowKey(r) });
   tr.append(
     h("td", { class: "td-no sticky-1" }, no),
-    h("td", { class: "td-job sticky-2" }, draft ? h("span", { class: "draft-tag" }, "ใหม่") : r.job_no),
-    tdDate(r, "deposit_date", "วันที่ฝาก"),
-    tdDate(r, "delivery_date", "วันที่ส่ง"),
-    tdText(r, "to_name", "ถึง ผู้รับ", 150),
-    tdText(r, "to_dept", "แผนก ผู้รับ", 150),
-    tdBranch(r, "to", "สาขา ผู้รับ"),
-    tdText(r, "from_name", "จาก ผู้ส่ง", 150),
-    tdText(r, "from_dept", "แผนก ผู้ส่ง", 150),
-    tdBranch(r, "from", "สาขา ผู้ส่ง"),
-    tdText(r, "item_detail", "รายละเอียด สิ่งที่ส่ง", 500),
-    h("td", { "data-f": "qty" }, stepper(r, () => changed(r))),
-    h("td", { "data-f": "unit" }, unitSelect(r, "cell-in", () => changed(r))),
-    tdText(r, "remark", "หมายเหตุ", 500),
+    h("td", { class: "td-job sticky-2" }, draft ? h("span", { class: "draft-tag", title: r._from ? "คัดลอกจาก " + r._from : null }, "ใหม่") : r.job_no),
+    ...(draft ? [
+      tdDate(r, "deposit_date", "วันที่ฝาก"),
+      tdDate(r, "delivery_date", "วันที่ส่ง"),
+      tdText(r, "to_name", "ถึง ผู้รับ", 150),
+      tdText(r, "to_dept", "แผนก ผู้รับ", 150),
+      tdBranch(r, "to", "สาขา ผู้รับ"),
+      tdText(r, "from_name", "จาก ผู้ส่ง", 150),
+      tdText(r, "from_dept", "แผนก ผู้ส่ง", 150),
+      tdBranch(r, "from", "สาขา ผู้ส่ง"),
+      tdText(r, "item_detail", "รายละเอียด สิ่งที่ส่ง", 500),
+      h("td", { "data-f": "qty" }, stepper(r, () => changed(r))),
+      h("td", { "data-f": "unit" }, unitSelect(r, "cell-in", () => changed(r))),
+      tdText(r, "remark", "หมายเหตุ", 500),
+    ] : [
+      tdView("deposit_date", fmtDate(r.deposit_date), "v-num"),
+      tdView("delivery_date", fmtDate(r.delivery_date), "v-num"),
+      tdView("to_name", r.to_name),
+      tdView("to_dept", r.to_dept),
+      tdViewBranch(r, "to"),
+      tdView("from_name", r.from_name),
+      tdView("from_dept", r.from_dept),
+      tdViewBranch(r, "from"),
+      tdView("item_detail", r.item_detail),
+      tdView("qty", Number(r.qty).toLocaleString("th-TH"), "v-num v-qty"),
+      tdView("unit", r.unit),
+      tdView("remark", r.remark),
+    ]),
     tdActions(r),
   );
   markMissing(tr, r);
@@ -422,6 +439,18 @@ function markMissing(tr, r) {
     const td = tr.querySelector(`td[data-f="${f}"]`);
     if (td) td.classList.toggle("td-missing", !!show && !String(r[f] || "").trim());
   }
+}
+
+function tdView(f, text, cls) {
+  const s = text == null ? "" : String(text);
+  return h("td", { "data-f": f }, h("div", { class: "cell-view" + (cls ? " " + cls : ""), title: s || null }, s));
+}
+
+function tdViewBranch(r, side) {
+  const code = r[side + "_branch_code"], name = r[side + "_branch_name"];
+  return h("td", { "data-f": side + "_branch_code" },
+    h("div", { class: "cell-view cell-branch", title: code ? `${code} ${name || ""}`.trim() : null },
+      code ? [h("span", { class: "b-code" }, code), name ? h("span", { class: "b-name" }, name) : null] : null));
 }
 
 function tdText(r, f, label, max) {
@@ -480,10 +509,8 @@ function tdActions(r) {
       h("button", { type: "button", class: "btn btn-ok btn-sm", onclick: () => saveDraft(r) }, ico("check"), "บันทึก"),
       h("button", { type: "button", class: "btn-icon", title: "ยกเลิกแถวนี้", "aria-label": "ยกเลิกแถวนี้", onclick: () => cancelDraft(r) }, ico("close"))));
   }
-  const st = h("span", { class: "status", onclick: () => { if (st.classList.contains("err")) saveRow(r); } });
   return h("td", { class: "td-act" }, h("div", { class: "row-act" },
-    st,
-    h("button", { type: "button", class: "btn-icon", title: "ทำซ้ำแถวนี้", "aria-label": "ทำซ้ำแถวนี้", onclick: () => duplicateRow(r) }, ico("duplicate")),
+    h("button", { type: "button", class: "btn-icon", title: "คัดลอกเป็นแถวใหม่ (จะแก้ไข: คัดลอก → แก้ → บันทึก → ลบรายการเดิม)", "aria-label": "คัดลอกแถวนี้", onclick: () => duplicateRow(r) }, ico("duplicate")),
     h("button", { type: "button", class: "btn-icon del", title: "ลบแถวนี้", "aria-label": "ลบแถวนี้", onclick: () => deleteRow(r) }, ico("trash"))));
 }
 
@@ -498,50 +525,10 @@ function cellKeys(e) {
   if (target) { target.focus(); if (target.select) target.select(); }
 }
 
-function setStatus(r, s, msg) {
-  const tr = rowEl(r);
-  const el = tr && tr.querySelector(".status");
-  if (!el) return;
-  el.className = "status " + (s || "");
-  el.title = { ok: "บันทึกแล้ว", saving: "กำลังบันทึก…", err: "บันทึกไม่สำเร็จ — กดเพื่อลองใหม่ " + (msg || "") }[s] || "";
-  el.replaceChildren(...(s === "ok" ? [ico("check")] : s === "err" ? [ico("triangle-warning")] : []));
-  if (s === "ok") {
-    clearTimeout(r._st);
-    r._st = setTimeout(() => { if (el.classList.contains("ok")) { el.className = "status"; el.replaceChildren(); } }, 2500);
-  }
-}
-
 // ---------- บันทึก ----------
 function changed(r) {
   markMissing(rowEl(r), r);
-  if (r.id) scheduleSave(r);
-  else renderSummary();
-}
-
-function scheduleSave(r) {
-  r._v = (r._v || 0) + 1;
-  r._pending = true;
-  clearTimeout(r._t);
-  setStatus(r, "saving");
-  r._t = setTimeout(() => saveRow(r), 700);
-}
-
-async function saveRow(r) {
-  if (r._busy) return;
-  const v = r._v;
-  r._busy = true;
-  setStatus(r, "saving");
-  try {
-    const d = await api("/jobs/" + r.id, { method: "PUT", body: payload(r) });
-    r.updated_at = d.item.updated_at;
-    if (r._v === v) { r._pending = false; setStatus(r, "ok"); }
-  } catch (e) {
-    setStatus(r, "err", e.message);
-    toast("บันทึกไม่สำเร็จ: " + e.message, "err");
-  } finally {
-    r._busy = false;
-    if (r._v !== v) saveRow(r);
-  }
+  renderSummary();
 }
 
 async function saveDraft(r) {
@@ -561,7 +548,7 @@ async function saveDraft(r) {
     const d = await api("/jobs", { method: "POST", body: payload(r) });
     rememberSender(r);
     S.drafts = S.drafts.filter(x => x !== r);
-    await placeNewJob(d.item);
+    await placeNewJob(d.item, r._from);
   } catch (e) {
     toast("บันทึกไม่สำเร็จ: " + e.message, "err");
   } finally {
@@ -570,7 +557,7 @@ async function saveDraft(r) {
 }
 
 // ใส่รายการที่เพิ่งได้เลขงานลงในหน้าจอ
-async function placeNewJob(item) {
+async function placeNewJob(item, from) {
   if (item.work_date !== S.date) {          // เช่น ข้ามเที่ยงคืนพอดี
     S.date = item.work_date;
     S.today = item.work_date;
@@ -579,7 +566,7 @@ async function placeNewJob(item) {
     S.jobs.push(item);
     render();
   }
-  toast(`บันทึกแล้ว ได้เลขงาน ${item.job_no}`, "ok");
+  toast(from ? `บันทึกแล้ว ได้เลขงาน ${item.job_no} — ถ้าเป็นการแก้ไข อย่าลืมลบ ${from}` : `บันทึกแล้ว ได้เลขงาน ${item.job_no}`, "ok");
   const el = document.querySelector(`[data-key="j${item.id}"]`);
   if (el) { el.classList.add("flash"); el.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
 }
@@ -608,7 +595,7 @@ async function duplicateRow(src) {
   S.drafts.push(r);
   render();
   focusRow(r, "item_detail");
-  toast("คัดลอกแถวแล้ว — แก้ไขแล้วกด “บันทึก”", "info");
+  toast(`คัดลอก ${src.job_no} แล้ว — แก้ข้อมูลแล้วกด “บันทึก” (ถ้าเป็นการแก้ไข ให้ลบ ${src.job_no} ทีหลัง)`, "info");
 }
 
 function focusRow(r, f) {
@@ -629,7 +616,6 @@ async function deleteRow(r) {
   const desc = [r.job_no, r.to_branch_code, r.item_detail].filter(Boolean).join(" · ");
   if (!await confirmDialog("ลบรายการนี้ใช่ไหม?", desc, "ลบรายการ")) return false;
   try {
-    clearTimeout(r._t);
     await api("/jobs/" + r.id, { method: "DELETE" });
     S.jobs = S.jobs.filter(x => x !== r);
     render();
@@ -663,7 +649,6 @@ function card(r, no) {
   const draft = !r.id;
   const toSub = [r.to_name, r.to_dept].filter(Boolean).join(" · ");
   const fromSub = [r.from_dept, r.from_branch_code].filter(Boolean).join(" · ");
-  const open = () => (draft ? openForm(r, null, r) : openForm(r, r));
   const el = h("article", { class: "card", "data-key": rowKey(r) },
     h("div", { class: "card-top" },
       h("span", { class: "card-no" }, no),
@@ -678,23 +663,22 @@ function card(r, no) {
     h("div", { class: "card-row" }, h("span", { class: "lbl item" }, "ของ"),
       h("div", { class: "main" }, r.item_detail || "—", h("span", { class: "card-qty" }, `${r.qty} ${r.unit}`))),
     r.remark ? h("div", { class: "card-row" }, h("span", { class: "lbl" }, "หมายเหตุ"), h("div", { class: "sub" }, r.remark)) : null,
-    h("div", { class: "card-act" },
-      h("button", { type: "button", class: "btn btn-ghost", onclick: open }, ico("pencil"), "แก้ไข"),
-      draft ? null : h("button", { type: "button", class: "btn btn-ghost", onclick: () => duplicateRow(r) }, ico("duplicate"), "ทำซ้ำ"),
-      draft ? null : h("button", { type: "button", class: "btn btn-ghost del", "aria-label": "ลบ", onclick: () => deleteRow(r) }, ico("trash"))));
-  el.addEventListener("click", e => { if (!e.target.closest("button")) open(); });
+    h("div", { class: "card-act" }, draft
+      ? h("button", { type: "button", class: "btn btn-ghost", onclick: () => openForm(r, r) }, ico("pencil"), "กรอกต่อ")
+      : [h("button", { type: "button", class: "btn btn-ghost", onclick: () => duplicateRow(r) }, ico("duplicate"), "คัดลอก"),
+         h("button", { type: "button", class: "btn btn-ghost del", onclick: () => deleteRow(r) }, ico("trash"), "ลบ")]));
+  if (draft) el.addEventListener("click", e => { if (!e.target.closest("button")) openForm(r, r); });
   return el;
 }
 
 // ---------- ฟอร์ม (มือถือ) ----------
-const FORM = { row: null, src: null, draft: null };
+const FORM = { row: null, draft: null };
 
-function openForm(r, src, draft) {
-  FORM.src = src || null;        // รายการเดิมที่กำลังแก้
+// ใช้กรอกรายการใหม่เท่านั้น — รายการที่บันทึกแล้วแก้ไม่ได้ (คัดลอกมาแก้แทน)
+function openForm(r, draft) {
   FORM.draft = draft || null;    // แถวใหม่จากตาราง (ถ้ามี)
   FORM.row = { ...r };
-  $("#formTitle").textContent = src ? "แก้ไข " + src.job_no : "เพิ่มรายการใหม่";
-  $("#formDelete").hidden = !src;
+  $("#formTitle").textContent = r._from ? "คัดลอกจาก " + r._from : "เพิ่มรายการใหม่";
   buildForm(FORM.row);
   openModal("#formModal");
   $("#formBody").scrollTop = 0;
@@ -780,19 +764,11 @@ async function submitForm(e) {
   const btn = $("#formSave");
   btn.disabled = true;
   try {
-    if (FORM.src) {
-      const d = await api("/jobs/" + FORM.src.id, { method: "PUT", body: payload(r) });
-      Object.assign(FORM.src, d.item);
-      closeModal("#formModal");
-      render();
-      toast("บันทึกการแก้ไขแล้ว", "ok");
-    } else {
-      const d = await api("/jobs", { method: "POST", body: payload(r) });
-      rememberSender(r);
-      if (FORM.draft) S.drafts = S.drafts.filter(x => x !== FORM.draft);
-      closeModal("#formModal");
-      await placeNewJob(d.item);
-    }
+    const d = await api("/jobs", { method: "POST", body: payload(r) });
+    rememberSender(r);
+    if (FORM.draft) S.drafts = S.drafts.filter(x => x !== FORM.draft);
+    closeModal("#formModal");
+    await placeNewJob(d.item, r._from);
   } catch (err) {
     toast("บันทึกไม่สำเร็จ: " + err.message, "err");
   } finally {
@@ -1020,10 +996,6 @@ function pickDate(iso) {
 // =============================================================================
 function setDate(iso) {
   if (iso === S.date) return;
-  if (S.jobs.some(j => j._pending || j._busy)) {
-    toast("กรุณารอให้บันทึกการแก้ไขเสร็จก่อนเปลี่ยนวัน", "err");
-    return;
-  }
   if (S.drafts.length) {
     toast("มีแถวใหม่ที่ยังไม่บันทึก — กด “บันทึก” หรือยกเลิกก่อนเปลี่ยนวัน", "err");
     return;
@@ -1092,7 +1064,6 @@ function applySize() {
 // แก้ข้อมูลอยู่ / มีป๊อปอัพเปิด / มีแถวใหม่ → ห้ามรีเฟรชทับ
 function idle() {
   if (S.drafts.length || modalStack.length) return false;
-  if (S.jobs.some(j => j._pending || j._busy)) return false;
   const a = document.activeElement;
   return !(a && a.closest && a.closest("#sheet, #cards") && a.matches("input, select, textarea"));
 }
@@ -1126,7 +1097,6 @@ function setIcons() {
   $("#calPrev").replaceChildren(ico("arrow-small-left"));
   $("#calNext").replaceChildren(ico("arrow-small-right"));
   $("#formSave").replaceChildren(ico("check"), "บันทึก");
-  $("#formDelete").replaceChildren(ico("trash"), "ลบ");
   document.querySelectorAll(".modal-head [data-close]").forEach(b => b.replaceChildren(ico("close")));
 }
 
@@ -1140,7 +1110,6 @@ function bindEvents() {
   $("#btnPrint").addEventListener("click", printDay);
   $("#btnExcel").addEventListener("click", exportExcel);
   $("#btnRefresh").addEventListener("click", () => {
-    if (S.jobs.some(j => j._pending || j._busy)) { toast("รอบันทึกให้เสร็จก่อนนะ", "info"); return; }
     loadJobs();
     loadBranches();
   });
@@ -1191,12 +1160,9 @@ function bindEvents() {
   $("#calTomorrow").addEventListener("click", () => pickDate(addDays(S.today, 1)));
 
   $("#jobForm").addEventListener("submit", submitForm);
-  $("#formDelete").addEventListener("click", async () => {
-    if (FORM.src && await deleteRow(FORM.src)) closeModal("#formModal");
-  });
 
   window.addEventListener("beforeunload", e => {
-    if (S.drafts.some(hasContent) || S.jobs.some(j => j._pending || j._busy)) { e.preventDefault(); e.returnValue = ""; }
+    if (S.drafts.some(hasContent)) { e.preventDefault(); e.returnValue = ""; }
   });
   document.addEventListener("visibilitychange", () => { if (!document.hidden) tick(); });
   setInterval(tick, POLL_MS);
